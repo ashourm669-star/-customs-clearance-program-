@@ -16,6 +16,9 @@ function redirectTo(_request: Request, path: string) {
 }
 
 export async function POST(request: Request) {
+  if (!process.env.DATABASE_URL) {
+    return redirectTo(request, `/login?mode=register&error=${encodeURIComponent("لم يتم ربط قاعدة البيانات بعد. أضف DATABASE_URL في Vercel ثم أعد النشر.")}`);
+  }
   await ensureSeeded();
   const contentType = request.headers.get("content-type") ?? "";
   const isForm = contentType.includes("form-urlencoded") || contentType.includes("multipart/form-data");

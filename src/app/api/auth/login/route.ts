@@ -13,7 +13,13 @@ function redirectTo(_request: Request, path: string) {
   return new Response(null, { status: 303, headers: { Location: safePath, "Cache-Control": "no-store" } });
 }
 
+const dbMissing = (isForm: boolean, request: Request) =>
+  isForm
+    ? redirectTo(request, `/login?error=${encodeURIComponent("لم يتم ربط قاعدة البيانات بعد. أضف DATABASE_URL في Vercel ثم أعد النشر.")}`)
+    : jsonError("لم يتم ربط قاعدة البيانات بعد. أضف DATABASE_URL في Vercel ثم أعد النشر.", 503);
+
 export async function POST(request: Request) {
+  if (!process.env.DATABASE_URL) return dbMissing(true, request);
   await ensureSeeded();
   const contentType = request.headers.get("content-type") ?? "";
   const isForm = contentType.includes("form-urlencoded") || contentType.includes("multipart/form-data");

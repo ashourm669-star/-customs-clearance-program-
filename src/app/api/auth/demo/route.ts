@@ -14,6 +14,9 @@ function redirectTo(_request: Request, path: string) {
 }
 
 export async function GET(request: Request) {
+  if (!process.env.DATABASE_URL) {
+    return redirectTo(request, `/login?error=${encodeURIComponent("قاعدة البيانات غير مربوطة. من Vercel: Storage ← Create Database ← Neon ثم Redeploy.")}`);
+  }
   try {
     await ensureSeeded();
     let demo = (await db.select().from(users).where(eq(users.email, "admin@alarabi.com")).limit(1))[0];
