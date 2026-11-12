@@ -1,6 +1,6 @@
 import { count } from "drizzle-orm";
 import { db } from "@/db";
-import { carriers, clients, documents, invoices, shipments } from "@/db/schema";
+import { carriers, clients, documents, invoices, shipments, users } from "@/db/schema";
 import { requireUser, ROLE_LABELS } from "@/lib/auth";
 import { getStorageStats } from "@/lib/storage";
 import { getAppSettings } from "@/lib/queries";
@@ -10,12 +10,13 @@ export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
   const user = await requireUser();
-  const [shipmentCount, clientCount, carrierCount, invoiceCount, documentCount, storage, company] = await Promise.all([
+  const [shipmentCount, clientCount, carrierCount, invoiceCount, documentCount, userCount, storage, company] = await Promise.all([
     db.select({ total: count() }).from(shipments),
     db.select({ total: count() }).from(clients),
     db.select({ total: count() }).from(carriers),
     db.select({ total: count() }).from(invoices),
     db.select({ total: count() }).from(documents),
+    db.select({ total: count() }).from(users),
     getStorageStats(),
     getAppSettings(),
   ]);
@@ -32,6 +33,7 @@ export default async function SettingsPage() {
         carriers: Number(carrierCount[0]?.total ?? 0),
         invoices: Number(invoiceCount[0]?.total ?? 0),
         documents: Number(documentCount[0]?.total ?? 0),
+        users: Number(userCount[0]?.total ?? 0),
       }}
     />
   );

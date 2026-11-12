@@ -34,7 +34,7 @@ export function SettingsClient({
 }: {
   user: SessionUser;
   roleLabel: string;
-  stats: { shipments: number; clients: number; carriers: number; invoices: number; documents: number };
+  stats: { shipments: number; clients: number; carriers: number; invoices: number; documents: number; users: number };
   storage: StorageStats;
   company: Record<string, string>;
 }) {
@@ -53,10 +53,10 @@ export function SettingsClient({
     company_name_en: company.company_name_en ?? "Al-Araby Customs & Logistics Services",
     commercial_register: company.commercial_register ?? "364",
     tax_id: company.tax_id ?? "439942616",
-    customs_license: company.customs_license ?? "EG-CB-10942",
-    phone: company.phone ?? "+20 3 480 2244",
-    email: company.email ?? "info@alarabi-logistics.com",
-    address: company.address ?? "الإسكندرية، مصر",
+    customs_license: company.customs_license ?? "",
+    phone: company.phone ?? "",
+    email: company.email ?? "",
+    address: company.address ?? "",
     website: company.website ?? "",
   });
   const [savingCompany, setSavingCompany] = useState(false);
@@ -66,9 +66,10 @@ export function SettingsClient({
     setSavingCompany(true);
     try {
       const response = await fetch("/api/settings/company", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(companyForm) });
-      const data = await response.json();
+      const data = await response.json() as { error?: string; company?: Record<string, string> };
       if (!response.ok) throw new Error(data.error ?? "تعذّر الحفظ");
-      toast({ title: "تم حفظ بيانات المنشأة", description: `سجل تجاري ${companyForm.commercial_register} · ضريبي ${companyForm.tax_id}`, tone: "success" });
+      if (data.company) setCompanyForm((current) => ({ ...current, ...data.company }));
+      toast({ title: "تم حفظ بيانات المنشأة في قاعدة البيانات", description: `السجل ${companyForm.commercial_register} · الضريبي ${companyForm.tax_id} · العنوان ${companyForm.address || "غير محدد"}`, tone: "success" });
       router.refresh();
     } catch (error) { toast({ title: "تعذّر الحفظ", description: error instanceof Error ? error.message : undefined, tone: "error" }); }
     finally { setSavingCompany(false); }
@@ -221,16 +222,17 @@ export function SettingsClient({
         <div className="space-y-5">
           <InstallAppCard />
 
-          <SectionCard title="بيانات المنشأة" description="السجل التجاري والرقم الضريبي يظهران في السندات والفواتير المطبوعة" bodyClassName="p-5">
+          <SectionCard title="تحرير بيانات المنشأة" description="كل الحقول قابلة للتعديل. أدخل العنوان والهاتف والترخيص الحقيقيين ثم اضغط حفظ؛ بطاقة المعاينة أسفل النموذج تتحدث مباشرة." bodyClassName="p-5">
             <form onSubmit={saveCompany} className="grid gap-3 sm:grid-cols-2">
               <Field label="اسم المنشأة"><input className="input" value={companyForm.company_name} onChange={(event) => setCompanyForm({ ...companyForm, company_name: event.target.value })} /></Field>
               <Field label="الاسم بالإنجليزية"><input className="input" dir="ltr" value={companyForm.company_name_en} onChange={(event) => setCompanyForm({ ...companyForm, company_name_en: event.target.value })} /></Field>
               <Field label="رقم السجل التجاري" required><input className="input" dir="ltr" value={companyForm.commercial_register} onChange={(event) => setCompanyForm({ ...companyForm, commercial_register: event.target.value })} required /></Field>
               <Field label="الرقم الضريبي" required><input className="input" dir="ltr" value={companyForm.tax_id} onChange={(event) => setCompanyForm({ ...companyForm, tax_id: event.target.value })} required /></Field>
-              <Field label="رقم ترخيص المخلص"><input className="input" dir="ltr" value={companyForm.customs_license} onChange={(event) => setCompanyForm({ ...companyForm, customs_license: event.target.value })} /></Field>
-              <Field label="الهاتف"><input className="input" dir="ltr" value={companyForm.phone} onChange={(event) => setCompanyForm({ ...companyForm, phone: event.target.value })} /></Field>
-              <Field label="البريد الرسمي"><input className="input" dir="ltr" value={companyForm.email} onChange={(event) => setCompanyForm({ ...companyForm, email: event.target.value })} /></Field>
-              <Field label="العنوان"><input className="input" value={companyForm.address} onChange={(event) => setCompanyForm({ ...companyForm, address: event.target.value })} /></Field>
+              <Field label="رقم ترخيص المخلص"><input className="input" dir="ltr" placeholder="رقم الترخيص الرسمي — لا تضع رقماً تجريبياً" value={companyForm.customs_license} onChange={(event) => setCompanyForm({ ...companyForm, customs_license: event.target.value })} /></Field>
+              <Field label="الهاتف"><input className="input" dir="ltr" placeholder="رقم هاتف المنشأة الحقيقي" value={companyForm.phone} onChange={(event) => setCompanyForm({ ...companyForm, phone: event.target.value })} /></Field>
+              <Field label="البريد الرسمي للمنشأة"><input type="email" className="input" dir="ltr" placeholder="البريد الرسمي إن وجد" value={companyForm.email} onChange={(event) => setCompanyForm({ ...companyForm, email: event.target.value })} /></Field>
+              <Field label="الموقع الإلكتروني"><input type="url" className="input" dir="ltr" placeholder="https://..." value={companyForm.website} onChange={(event) => setCompanyForm({ ...companyForm, website: event.target.value })} /></Field>
+              <Field label="عنوان المنشأة الحقيقي" className="sm:col-span-2"><textarea className="input min-h-20" rows={2} placeholder="اكتب المحافظة، الحي، الشارع ورقم المبنى كما في السجل التجاري" value={companyForm.address} onChange={(event) => setCompanyForm({ ...companyForm, address: event.target.value })} /></Field>
               <div className="sm:col-span-2 flex justify-end"><button type="submit" className="btn btn-primary" disabled={savingCompany}>{savingCompany ? <Spinner /> : <Save className="size-4" />} حفظ بيانات المنشأة</button></div>
             </form>
           </SectionCard>
@@ -241,16 +243,17 @@ export function SettingsClient({
                 <ShieldCheck className="size-6" />
               </span>
               <div>
-                <p className="text-sm font-extrabold text-slate-900">العربي للخدمات الجمركية</p>
-                <p className="text-[11px] text-slate-500">واللوجستية · الإسكندرية، مصر</p>
+                <p className="text-sm font-extrabold text-slate-900">{companyForm.company_name || "اسم المنشأة غير محدد"}</p>
+                <p className="text-[11px] text-slate-500">{companyForm.address || "العنوان غير محدد — اكتبه في النموذج أعلاه"}</p>
               </div>
             </div>
             <ul className="mt-4 space-y-2.5 text-[11px]">
               {[
-                { icon: <Building2 className="size-3.5" />, label: "السجل التجاري", value: "88421 - الإسكندرية" },
-                { icon: <BadgeCheck className="size-3.5" />, label: "رقم المخلص الجمركي", value: "EG-CB-10942" },
-                { icon: <Phone className="size-3.5" />, label: "الهاتف", value: "+20 3 480 2244" },
-                { icon: <Mail className="size-3.5" />, label: "البريد", value: "info@alarabi-logistics.com" },
+                { icon: <Building2 className="size-3.5" />, label: "السجل التجاري", value: companyForm.commercial_register || "غير محدد" },
+                { icon: <BadgeCheck className="size-3.5" />, label: "الرقم الضريبي", value: companyForm.tax_id || "غير محدد" },
+                { icon: <ShieldCheck className="size-3.5" />, label: "ترخيص المخلص", value: companyForm.customs_license || "لم يُحدَّد بعد" },
+                { icon: <Phone className="size-3.5" />, label: "الهاتف", value: companyForm.phone || "لم يُحدَّد بعد" },
+                { icon: <Mail className="size-3.5" />, label: "البريد", value: companyForm.email || "لم يُحدَّد بعد" },
                 { icon: <Globe2 className="size-3.5" />, label: "نافذة", value: "يتطلب اعتماد API رسمي" },
               ].map((item) => (
                 <li key={item.label} className="flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2">
@@ -274,7 +277,7 @@ export function SettingsClient({
                 { label: "شركات الشحن", value: stats.carriers },
                 { label: "الفواتير", value: stats.invoices },
                 { label: "المستندات", value: stats.documents },
-                { label: "المستخدمون", value: 3 },
+                { label: "المستخدمون", value: stats.users },
               ].map((item) => (
                 <div key={item.label} className="rounded-xl border border-slate-100 p-3 text-center">
                   <p className="text-lg font-extrabold text-slate-900">{item.value}</p>

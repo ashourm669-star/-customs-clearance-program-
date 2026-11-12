@@ -13,7 +13,7 @@ import {
   banks,
 } from "@/db/schema";
 import { hashPassword } from "@/lib/password";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { ensureSchema } from "@/lib/db-bootstrap";
 import { seedCustomsReference } from "@/lib/seed-customs";
 import type { DocType, Direction, InvoiceStatus, Mode, Priority, ShipmentStatus } from "@/lib/constants";
@@ -868,6 +868,23 @@ export async function ensureSeeded() {
             });
           }
           await db.insert(appSettings).values({ key: "business_identity_2026_11_v1", value: "applied" })
+            .onConflictDoNothing();
+        }
+        // Remove only placeholder contact information from the old demo; keep any real values the user entered.
+        const cleanupMarker = await db.select({ key: appSettings.key }).from(appSettings)
+          .where(eq(appSettings.key, "company_placeholder_cleanup_v1")).limit(1);
+        if (!cleanupMarker.length) {
+          const placeholders: Record<string, string> = {
+            address: "الإسكندرية، مصر",
+            phone: "+20 3 480 2244",
+            email: "info@alarabi-logistics.com",
+            customs_license: "EG-CB-10942",
+          };
+          for (const [key, oldValue] of Object.entries(placeholders)) {
+            await db.update(appSettings).set({ value: "", updatedAt: new Date() })
+              .where(and(eq(appSettings.key, key), eq(appSettings.value, oldValue)));
+          }
+          await db.insert(appSettings).values({ key: "company_placeholder_cleanup_v1", value: "applied" })
             .onConflictDoNothing();
         }
         // Change only the original demo admin email; never alter the user's password hash.

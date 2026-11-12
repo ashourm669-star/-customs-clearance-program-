@@ -1,6 +1,7 @@
 import { eq, ilike } from "drizzle-orm";
 import { db } from "@/db";
 import { shipmentEvents, shipments } from "@/db/schema";
+import { getAppSettings } from "@/lib/queries";
 
 export type NafezaResult = {
   ok: boolean;
@@ -69,8 +70,10 @@ export async function sendNafezaDeclaration(identifier: string, actor: string): 
     };
   }
 
+  const company = await getAppSettings();
+  const license = company.customs_license?.trim() ?? "";
   const declaration = {
-    declarant: { name: actor, license: "EG-CB-10942" },
+    declarant: { name: actor, license: license || null },
     transportDocumentReference: shipment.blNumber,
     fileReference: shipment.reference,
     portOfEntry: shipment.port,
@@ -95,6 +98,17 @@ export async function sendNafezaDeclaration(identifier: string, actor: string): 
         "لا يوجد ربط معتمد مع نافذة. يتطلب NAFEZA_TOKEN_URL وNAFEZA_DECLARATIONS_URL الموثقين من نافذة وNAFEZA_CLIENT_ID وNAFEZA_CLIENT_SECRET. رقم ACID يصدر من نافذة فقط.",
       httpStatus: null,
       payload: declaration,
+    };
+  }
+
+  if (!license) {
+    return {
+      ok: false,
+      status: "error",
+      reference: null,
+      message: "أدخل رقم ترخيص المخلص الحقيقي في الإعدادات قبل إرسال أي بيان إلى نافذة.",
+      httpStatus: null,
+      payload: null,
     };
   }
 
