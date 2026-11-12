@@ -1,49 +1,44 @@
-import { cookies, headers } from "next/headers";
-import { and, eq, gt } from "drizzle-orm";
 import { randomBytes } from "node:crypto";
+import { cookies, headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { and, eq, gt } from "drizzle-orm";
 import { db } from "@/db";
 import { sessions, users } from "@/db/schema";
+import { ensureSeeded } from "@/lib/seed";
 
 export const SESSION_COOKIE = "alarabi_session";
-const SESSION_DAYS = 14;
+const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30;
 
 export type SessionUser = {
   id: number;
   name: string;
   email: string;
   role: string;
+  jobTitle: string | null;
   phone: string | null;
-  active: boolean;
-  createdAt: string;
+  avatarColor: string;
 };
 
-/** Returns every available session token: bearer header first, cookie second. */
-export async function sessionTokens(): Promise<string[]> {
-  const headerList = await headers();
-  const auth = headerList.get("authorization");
-  const bearer = auth?.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
-  const explicit = headerList.get("x-session-token") ?? "";
-  const store = await cookies();
-  const cookieToken = store.get(SESSION_COOKIE)?.value ?? "";
-  return [...new Set([bearer, explicit, cookieToken].filter(Boolean))];
+async function isSecureRequest() {
+  try {
+    const store = await headers();
+    const proto = (store.get("x-forwarded-proto") ?? "").split(",")[0]?.trim().toLowerCase();
+    return proto === "https";
+  } catch {
+    return false;
+  }
 }
 
-export async function readToken(): Promise<string | null> {
-  return (await sessionTokens())[0] ?? null;
-}
-
-export async function createSession(userId: number): Promise<string> {
+export async function createSession(userId: number) {
   const token = randomBytes(32).toString("hex");
-  const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
+  const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
   await db.insert(sessions).values({ token, userId, expiresAt });
+  const secure = await isSecureRequest();
   const store = await cookies();
-  const production = process.env.NODE_ENV === "production";
   store.set(SESSION_COOKIE, token, {
     httpOnly: true,
-    // SameSite=None keeps the session usable when the preview is embedded in an iframe.
-    sameSite: production ? "none" : "lax",
-    secure: production,
-    partitioned: production,
+    sameSite: secure ? "none" : "lax",
+    secure,
     path: "/",
     expires: expiresAt,
   });
@@ -51,46 +46,51 @@ export async function createSession(userId: number): Promise<string> {
 }
 
 export async function destroySession() {
-  for (const token of await sessionTokens()) {
+  const store = await cookies();
+  const token = store.get(SESSION_COOKIE)?.value;
+  if (token) {
     await db.delete(sessions).where(eq(sessions.token, token));
   }
-  const store = await cookies();
   store.delete(SESSION_COOKIE);
 }
 
-export async function getSession(): Promise<SessionUser | null> {
-  const tokens = await sessionTokens();
-  for (const token of tokens) {
+export async function getCurrentUser(): Promise<SessionUser | null> {
+  try {
+    await ensureSeeded();
+    const store = await cookies();
+    const token = store.get(SESSION_COOKIE)?.value;
+    if (!token) return null;
+
     const rows = await db
       .select({
         id: users.id,
         name: users.name,
         email: users.email,
         role: users.role,
+        jobTitle: users.jobTitle,
         phone: users.phone,
-        active: users.active,
-        createdAt: users.createdAt,
+        avatarColor: users.avatarColor,
       })
       .from(sessions)
-      .innerJoin(users, eq(sessions.userId, users.id))
+      .innerJoin(users, eq(users.id, sessions.userId))
       .where(and(eq(sessions.token, token), gt(sessions.expiresAt, new Date())))
       .limit(1);
-    const row = rows[0];
-    if (!row || !row.active) continue;
-    return {
-      id: row.id,
-      name: row.name,
-      email: row.email,
-      role: row.role,
-      phone: row.phone,
-      active: row.active,
-      createdAt: row.createdAt.toISOString(),
-    };
+
+    return rows[0] ?? null;
+  } catch (error) {
+    console.error("[auth] session lookup failed:", error);
+    return null;
   }
-  return null;
 }
 
-/** Used only by API routes: returns null instead of redirecting. */
-export async function requireApiUser(): Promise<SessionUser | null> {
-  return getSession();
+export async function requireUser(): Promise<SessionUser> {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login?expired=1");
+  return user;
 }
+
+export const ROLE_LABELS: Record<string, string> = {
+  admin: "مدير النظام",
+  manager: "مدير تشغيل",
+  agent: "مخلص جمركي",
+};

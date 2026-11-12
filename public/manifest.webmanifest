@@ -1,25 +1,26 @@
 {
-  "name": "العربي | التخليص الجمركي واللوجستيات",
-  "short_name": "العربي",
-  "description": "نظام الشركة العربي لإدارة الشحنات والتخليص الجمركي وربط الناقلين ومنصة نافذة",
+  "id": "/dashboard",
+  "name": "العربي للخدمات الجمركية واللوجستية",
+  "short_name": "العربي جمرك",
+  "description": "منصة إدارة ملفات التخليص الجمركي، الشحنات، المستندات، الفواتير، وتتبع البوالص مع الخطوط الملاحية وشركات الطيران ومنصة نافذة.",
   "lang": "ar",
   "dir": "rtl",
   "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
-  "orientation": "any",
-  "background_color": "#f4f7fb",
-  "theme_color": "#0b1d36",
+  "orientation": "portrait-primary",
+  "background_color": "#f2f5f9",
+  "theme_color": "#0a2239",
   "categories": ["business", "productivity", "utilities"],
   "icons": [
-    { "src": "/icons/app-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/app-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "shortcuts": [
-    { "name": "الشحنات", "short_name": "الشحنات", "url": "/shipments", "icons": [{ "src": "/icons/app-icon-192.png", "sizes": "192x192" }] },
-    { "name": "استعلام بوليصة", "short_name": "بوليصة", "url": "/lookup", "icons": [{ "src": "/icons/app-icon-192.png", "sizes": "192x192" }] },
-    { "name": "منصة نافذة", "short_name": "نافذة", "url": "/nafeza", "icons": [{ "src": "/icons/app-icon-192.png", "sizes": "192x192" }] }
+    { "name": "ملفات التخليص", "short_name": "الملفات", "url": "/shipments", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "تتبع بوليصة", "short_name": "تتبع", "url": "/tracking", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "الفواتير", "short_name": "الفواتير", "url": "/invoices", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
   ]
 }

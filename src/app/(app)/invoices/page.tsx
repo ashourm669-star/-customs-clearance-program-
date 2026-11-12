@@ -1,7 +1,21 @@
-"use client";
-import { ResourcePage } from "@/components/resource-page";
-import { pageConfigs } from "@/lib/ui-config";
+import { listClients, listInvoices, listShipments } from "@/lib/queries";
+import { InvoicesClient } from "./invoices-client";
 
-export default function InvoicesPage() {
-  return <ResourcePage config={pageConfigs.invoices} />;
+export const dynamic = "force-dynamic";
+
+export default async function InvoicesPage() {
+  const [invoices, clients, shipments] = await Promise.all([listInvoices(), listClients(), listShipments()]);
+
+  return (
+    <InvoicesClient
+      initialInvoices={invoices}
+      clients={clients.map((client) => ({ id: client.id, name: client.name }))}
+      shipments={shipments.map((shipment) => ({
+        id: shipment.id,
+        reference: shipment.reference,
+        clientId: shipment.clientId,
+        fees: shipment.dutyAmount + shipment.vatAmount + shipment.serviceFees,
+      }))}
+    />
+  );
 }

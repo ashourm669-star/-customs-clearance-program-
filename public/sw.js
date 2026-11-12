@@ -1,68 +1,98 @@
-/* Al-Arabi Customs ERP service worker */
-const CACHE_NAME = "alarabi-pwa-v1";
+/* Al-Araby Customs PWA service worker */
+const VERSION = "alarabi-v1.0.0";
+const STATIC_CACHE = `${VERSION}-static`;
+const PAGE_CACHE = `${VERSION}-pages`;
+const OFFLINE_URL = "/offline";
+
 const PRECACHE = [
-  "/offline.html",
-  "/login",
-  "/manifest.webmanifest",
-  "/icons/app-icon-192.png",
-  "/icons/app-icon-512.png",
+  OFFLINE_URL,
+  "/icons/icon-192.png",
+  "/icons/icon-512.png",
+  "/icons/icon-maskable-512.png",
   "/icons/apple-touch-icon.png",
+  "/manifest.webmanifest",
 ];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(PRECACHE).catch(() => undefined))
-      .then(() => self.skipWaiting()),
+    (async () => {
+      const cache = await caches.open(STATIC_CACHE);
+      await cache.addAll(PRECACHE).catch(() => undefined);
+      await self.skipWaiting();
+    })(),
   );
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))))
-      .then(() => self.clients.claim()),
+    (async () => {
+      const keys = await caches.keys();
+      await Promise.all(keys.filter((key) => !key.startsWith(VERSION)).map((key) => caches.delete(key)));
+      await self.clients.claim();
+    })(),
   );
 });
+
+function isStaticAsset(url) {
+  return (
+    url.pathname.startsWith("/_next/static/") ||
+    url.pathname.startsWith("/icons/") ||
+    url.pathname === "/manifest.webmanifest" ||
+    /\.(?:css|js|png|jpg|jpeg|svg|webp|woff2?|ico)$/.test(url.pathname)
+  );
+}
 
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   if (request.method !== "GET") return;
+
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+  // Never cache API traffic: customs data must always be fresh and authenticated.
+  if (url.pathname.startsWith("/api/")) return;
 
-  // Never cache authenticated API data.
-  if (url.pathname.startsWith("/api/")) {
+  if (isStaticAsset(url)) {
     event.respondWith(
-      fetch(request).catch(() => new Response(
-        JSON.stringify({ error: "لا يوجد اتصال بالإنترنت، البيانات تحتاج اتصال بالخادم" }),
-        { status: 503, headers: { "Content-Type": "application/json; charset=utf-8" } },
-      )),
+      (async () => {
+        const cache = await caches.open(STATIC_CACHE);
+        const cached = await cache.match(request);
+        if (cached) return cached;
+        try {
+          const response = await fetch(request);
+          if (response.ok) cache.put(request, response.clone());
+          return response;
+        } catch {
+          return cached ?? Response.error();
+        }
+      })(),
     );
     return;
   }
 
   if (request.mode === "navigate") {
     event.respondWith(
-      fetch(request).catch(async () => (await caches.match("/offline.html")) || Response.error()),
-    );
-    return;
-  }
-
-  if (
-    url.pathname.startsWith("/_next/static/") ||
-    url.pathname.startsWith("/icons/") ||
-    url.pathname === "/favicon.ico" ||
-    url.pathname === "/manifest.webmanifest"
-  ) {
-    event.respondWith(
-      caches.match(request).then((cached) => cached || fetch(request).then((response) => {
-        if (response.ok) {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+      (async () => {
+        try {
+          const response = await fetch(request);
+          const cache = await caches.open(PAGE_CACHE);
+          if (response.ok && !url.pathname.startsWith("/login")) cache.put(request, response.clone());
+          return response;
+        } catch {
+          const cache = await caches.open(PAGE_CACHE);
+          const cached = (await cache.match(request)) ?? (await cache.match(OFFLINE_URL));
+          return (
+            cached ??
+            new Response("<h1>لا يوجد اتصال بالإنترنت</h1>", {
+              status: 503,
+              headers: { "Content-Type": "text/html; charset=utf-8" },
+            })
+          );
         }
-        return response;
-      })),
+      })(),
     );
   }
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data === "SKIP_WAITING") self.skipWaiting();
 });

@@ -1,7 +1,9 @@
-"use client";
-import { ResourcePage } from "@/components/resource-page";
-import { pageConfigs } from "@/lib/ui-config";
+import { listCarriers } from "@/lib/queries";
+import { CarriersClient } from "./carriers-client";
 
-export default function CarriersPage() {
-  return <ResourcePage config={pageConfigs.carriers} />;
+export const dynamic = "force-dynamic";
+
+export default async function CarriersPage() {
+  const carriers = await listCarriers();
+  return <CarriersClient initialCarriers={carriers} />;
 }

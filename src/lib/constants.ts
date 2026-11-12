@@ -1,218 +1,156 @@
-export const COMPANY = {
-  name: "الشركة العربي للخدمات الجمركية واللوجستية",
-  shortName: "العربي",
-  englishName: "Al-Arabi Customs Clearance & Logistics",
-  license: "ترخيص مزاولة مهنة التخليص الجمركي رقم ١٤٥٨ / ٢٠٢٦",
-  taxNumber: "٦٢١-٤٤٨-٩٠٣",
-  phone: "+٢٠ ٢ ٢٤٤٨ ٩٠١٢",
-  email: "operations@alarabi-eg.com",
-  address: "٤٢ شارع الجمهورية، الدور السابع، القاهرة - جمهورية مصر العربية",
+export type Tone = "slate" | "amber" | "sky" | "indigo" | "emerald" | "teal" | "rose" | "gold";
+
+export const SHIPMENT_STATUSES = [
+  "draft",
+  "documents_pending",
+  "under_review",
+  "customs_clearance",
+  "released",
+  "delivered",
+  "on_hold",
+] as const;
+export type ShipmentStatus = (typeof SHIPMENT_STATUSES)[number];
+
+export const SHIPMENT_STATUS_META: Record<ShipmentStatus, { label: string; tone: Tone; dot: string }> = {
+  draft: { label: "مسودة", tone: "slate", dot: "#94a3b8" },
+  documents_pending: { label: "بانتظار المستندات", tone: "amber", dot: "#f59e0b" },
+  under_review: { label: "قيد المراجعة", tone: "sky", dot: "#0ea5e9" },
+  customs_clearance: { label: "قيد التخليص", tone: "indigo", dot: "#6366f1" },
+  released: { label: "تم الإفراج", tone: "emerald", dot: "#10b981" },
+  delivered: { label: "تم التسليم", tone: "teal", dot: "#14b8a6" },
+  on_hold: { label: "معلّق", tone: "rose", dot: "#f43f5e" },
 };
 
-export type Option = { value: string; label: string };
-
-export const shipmentStatuses: Option[] = [
-  { value: "new", label: "شحنة جديدة" },
-  { value: "documents", label: "تجهيز المستندات" },
-  { value: "nafeza", label: "تسجيل نافذة" },
-  { value: "inspection", label: "الفحص والمعاينة" },
-  { value: "payment", label: "سداد الرسوم" },
-  { value: "released", label: "تم الإفراج" },
-  { value: "delivered", label: "تم التسليم" },
-  { value: "delayed", label: "متعثرة / تأخير" },
-];
-
-export const directions: Option[] = [
-  { value: "import", label: "استيراد" },
-  { value: "export", label: "تصدير" },
-  { value: "transit", label: "ترانزيت" },
-];
-
-export const transportModes: Option[] = [
-  { value: "air", label: "جوي" },
-  { value: "sea", label: "بحري" },
-  { value: "land", label: "بري" },
-];
-
-export const currencies: Option[] = [
-  { value: "EGP", label: "جنيه مصري (EGP)" },
-  { value: "USD", label: "دولار أمريكي (USD)" },
-  { value: "EUR", label: "يورو (EUR)" },
-  { value: "CNY", label: "يوان صيني (CNY)" },
-];
-
-export const clientTypes: Option[] = [
-  { value: "company", label: "شركة" },
-  { value: "individual", label: "فرد" },
-  { value: "government", label: "جهة حكومية" },
-  { value: "agent", label: "وكيل تجاري" },
-];
-
-export const carrierTypes: Option[] = [
-  { value: "airline", label: "شركة طيران" },
-  { value: "shipping", label: "خط ملاحي" },
-  { value: "land", label: "نقل بري" },
-];
-
-export const portTypes: Option[] = [
-  { value: "sea", label: "ميناء بحري" },
-  { value: "air", label: "مطار / منفذ جوي" },
-  { value: "land", label: "منفذ بري" },
-];
-
-export const integrationStates: Option[] = [
-  { value: "connected", label: "متصل عبر API" },
-  { value: "pending", label: "جاري الربط" },
-  { value: "manual", label: "تحديث يدوي" },
-];
-
-export const activeStates: Option[] = [
-  { value: "active", label: "نشط" },
-  { value: "inactive", label: "غير نشط" },
-];
-
-export const documentTypes: Option[] = [
-  { value: "commercial_invoice", label: "فاتورة تجارية" },
-  { value: "bill_of_lading", label: "بوليصة شحن / AWB" },
-  { value: "certificate_origin", label: "شهادة المنشأ" },
-  { value: "packing_list", label: "قائمة التعبئة" },
-  { value: "declaration", label: "بيان جمركي" },
-  { value: "release_order", label: "إذن تسليم" },
-  { value: "inspection", label: "شهادة فحص" },
-  { value: "other", label: "أخرى" },
-];
-
-export const documentStatuses: Option[] = [
-  { value: "required", label: "مطلوب" },
-  { value: "review", label: "قيد المراجعة" },
-  { value: "approved", label: "معتمد" },
-  { value: "rejected", label: "مرفوض" },
-];
-
-export const taskStatuses: Option[] = [
-  { value: "pending", label: "قيد الانتظار" },
-  { value: "in_progress", label: "جاري التنفيذ" },
-  { value: "done", label: "مكتملة" },
-  { value: "blocked", label: "متوقفة" },
-];
-
-export const taskStages: Option[] = [
-  { value: "documents", label: "المستندات" },
-  { value: "nafeza", label: "نافذة / ACID" },
-  { value: "customs", label: "الجمارك" },
-  { value: "inspection", label: "الفحص" },
-  { value: "payment", label: "السداد" },
-  { value: "delivery", label: "التسليم" },
-];
-
-export const priorities: Option[] = [
-  { value: "low", label: "منخفضة" },
-  { value: "normal", label: "عادية" },
-  { value: "high", label: "عالية" },
-  { value: "urgent", label: "عاجلة" },
-];
-
-export const invoiceStatuses: Option[] = [
-  { value: "draft", label: "مسودة" },
-  { value: "pending", label: "مستحقة" },
-  { value: "paid", label: "مدفوعة" },
-  { value: "overdue", label: "متأخرة" },
-];
-
-export const eventStatuses: Option[] = [
-  { value: "accepted", label: "مقبول" },
-  { value: "sent", label: "تم الإرسال" },
-  { value: "pending", label: "قيد المعالجة" },
-  { value: "rejected", label: "مرفوض" },
-];
-
-export const eventTypes: Option[] = [
-  { value: "acid_registration", label: "تسجيل ACID" },
-  { value: "declaration", label: "إرسال بيان جمركي" },
-  { value: "manifest", label: "استلام منيفست" },
-  { value: "carrier_sync", label: "مزامنة الناقل" },
-  { value: "release", label: "إذن الإفراج" },
-  { value: "inspection", label: "طلب معاينة" },
-  { value: "payment", label: "سداد رسوم" },
-];
-
-export const roles: Option[] = [
-  { value: "admin", label: "مدير النظام" },
-  { value: "manager", label: "مدير العمليات" },
-  { value: "operator", label: "مخلص جمركي" },
-  { value: "accountant", label: "محاسب" },
-  { value: "viewer", label: "مشاهد فقط" },
-];
-
-export const statusLabel = (list: Option[], value?: string | null) =>
-  list.find((item) => item.value === value)?.label ?? value ?? "—";
-
-export const toneByStatus: Record<string, string> = {
-  new: "bg-sky-50 text-sky-700 ring-sky-200",
-  draft: "bg-slate-50 text-slate-600 ring-slate-200",
-  documents: "bg-indigo-50 text-indigo-700 ring-indigo-200",
-  nafeza: "bg-violet-50 text-violet-700 ring-violet-200",
-  inspection: "bg-amber-50 text-amber-700 ring-amber-200",
-  payment: "bg-orange-50 text-orange-700 ring-orange-200",
-  released: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-  delivered: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-  accepted: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-  approved: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-  paid: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-  active: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-  connected: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-  done: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-  sent: "bg-sky-50 text-sky-700 ring-sky-200",
-  pending: "bg-amber-50 text-amber-700 ring-amber-200",
-  required: "bg-amber-50 text-amber-700 ring-amber-200",
-  review: "bg-indigo-50 text-indigo-700 ring-indigo-200",
-  in_progress: "bg-indigo-50 text-indigo-700 ring-indigo-200",
-  overdue: "bg-rose-50 text-rose-700 ring-rose-200",
-  rejected: "bg-rose-50 text-rose-700 ring-rose-200",
-  delayed: "bg-rose-50 text-rose-700 ring-rose-200",
-  blocked: "bg-rose-50 text-rose-700 ring-rose-200",
-  inactive: "bg-slate-100 text-slate-500 ring-slate-200",
-  manual: "bg-slate-100 text-slate-600 ring-slate-200",
+export const MODES = ["sea", "air", "land"] as const;
+export type Mode = (typeof MODES)[number];
+export const MODE_META: Record<Mode, { label: string; icon: string }> = {
+  sea: { label: "شحن بحري", icon: "🚢" },
+  air: { label: "شحن جوي", icon: "✈️" },
+  land: { label: "شحن بري", icon: "🚚" },
 };
 
-export const tone = (value?: string | null) =>
-  `inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset whitespace-nowrap ${toneByStatus[value ?? ""] ?? "bg-slate-50 text-slate-600 ring-slate-200"}`;
-
-export const formatNumber = (value?: number | string | null) => {
-  const n = Number(value ?? 0);
-  return Number.isFinite(n) ? n.toLocaleString("ar-EG", { maximumFractionDigits: 2 }) : "٠";
+export const DIRECTIONS = ["import", "export", "transit"] as const;
+export type Direction = (typeof DIRECTIONS)[number];
+export const DIRECTION_META: Record<Direction, { label: string; tone: Tone }> = {
+  import: { label: "وارد", tone: "sky" },
+  export: { label: "صادر", tone: "emerald" },
+  transit: { label: "عبور", tone: "gold" },
 };
 
-export const formatMoney = (value?: number | string | null, currency = "EGP") =>
-  `${formatNumber(value)} ${currency === "EGP" ? "ج.م" : currency}`;
-
-export const formatDate = (value?: string | Date | null) => {
-  if (!value) return "—";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return String(value);
-  return d.toLocaleDateString("ar-EG", { year: "numeric", month: "short", day: "numeric" });
+export const PRIORITIES = ["low", "normal", "high", "urgent"] as const;
+export type Priority = (typeof PRIORITIES)[number];
+export const PRIORITY_META: Record<Priority, { label: string; tone: Tone }> = {
+  low: { label: "منخفضة", tone: "slate" },
+  normal: { label: "عادية", tone: "sky" },
+  high: { label: "عالية", tone: "amber" },
+  urgent: { label: "عاجلة", tone: "rose" },
 };
 
-export const formatDateTime = (value?: string | Date | null) => {
-  if (!value) return "—";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return String(value);
-  return d.toLocaleString("ar-EG", { dateStyle: "medium", timeStyle: "short" });
+export const CARRIER_TYPES = ["airline", "shipping_line", "land", "platform"] as const;
+export type CarrierType = (typeof CARRIER_TYPES)[number];
+export const CARRIER_TYPE_META: Record<CarrierType, { label: string }> = {
+  airline: { label: "شركة طيران" },
+  shipping_line: { label: "خط ملاحي" },
+  land: { label: "نقل بري" },
+  platform: { label: "منصة حكومية" },
 };
 
-export const RESOURCE_NAMES: Record<string, string> = {
-  clients: "العملاء",
-  carriers: "شركات النقل",
-  ports: "الموانئ والمنافذ",
-  carrierConnections: "ربط الناقلين",
-  tariffItems: "البنود الجمركية",
-  shipmentItems: "أصناف الشحنة",
-  banks: "البنوك",
-  shipments: "الشحنات",
-  tasks: "المهام",
-  documents: "المستندات",
-  invoices: "الفواتير",
-  nafezaEvents: "أحداث نافذة",
-  users: "المستخدمون",
-  activities: "سجل النشاط",
+export const INTEGRATION_STATUSES = ["connected", "pending", "disconnected"] as const;
+export const INTEGRATION_META: Record<string, { label: string; tone: Tone }> = {
+  connected: { label: "متصل", tone: "emerald" },
+  pending: { label: "قيد التفعيل", tone: "amber" },
+  disconnected: { label: "غير متصل", tone: "rose" },
 };
+
+export const DOC_TYPES = [
+  "commercial_invoice",
+  "packing_list",
+  "bill_of_lading",
+  "awb",
+  "certificate_of_origin",
+  "permit",
+  "insurance",
+  "other",
+] as const;
+export type DocType = (typeof DOC_TYPES)[number];
+export const DOC_TYPE_META: Record<DocType, { label: string }> = {
+  commercial_invoice: { label: "فاتورة تجارية" },
+  packing_list: { label: "قائمة تعبئة" },
+  bill_of_lading: { label: "بوليصة شحن بحري" },
+  awb: { label: "بوليصة شحن جوي" },
+  certificate_of_origin: { label: "شهادة منشأ" },
+  permit: { label: "تصريح / موافقة" },
+  insurance: { label: "شهادة تأمين" },
+  other: { label: "مستند آخر" },
+};
+
+export const DOC_STATUSES = ["pending", "approved", "rejected"] as const;
+export const DOC_STATUS_META: Record<string, { label: string; tone: Tone }> = {
+  pending: { label: "بانتظار المراجعة", tone: "amber" },
+  approved: { label: "معتمد", tone: "emerald" },
+  rejected: { label: "مرفوض", tone: "rose" },
+};
+
+export const INVOICE_STATUSES = ["draft", "sent", "partially_paid", "paid", "overdue"] as const;
+export type InvoiceStatus = (typeof INVOICE_STATUSES)[number];
+export const INVOICE_STATUS_META: Record<InvoiceStatus, { label: string; tone: Tone }> = {
+  draft: { label: "مسودة", tone: "slate" },
+  sent: { label: "مرسلة", tone: "sky" },
+  partially_paid: { label: "مدفوعة جزئياً", tone: "amber" },
+  paid: { label: "مدفوعة", tone: "emerald" },
+  overdue: { label: "متأخرة", tone: "rose" },
+};
+
+export const EVENT_TYPES = ["status", "document", "customs", "payment", "note", "integration"] as const;
+export const EVENT_TYPE_META: Record<string, { label: string; color: string }> = {
+  status: { label: "تحديث حالة", color: "#0ea5e9" },
+  document: { label: "مستند", color: "#8b5cf6" },
+  customs: { label: "إجراء جمركي", color: "#6366f1" },
+  payment: { label: "مدفوعات", color: "#10b981" },
+  note: { label: "ملاحظة", color: "#64748b" },
+  integration: { label: "تكامل / تتبع", color: "#0f9d8b" },
+};
+
+export const CURRENCIES = ["USD", "EUR", "EGP", "AED", "SAR", "GBP"] as const;
+
+export const EGYPT_PORTS = [
+  "ميناء الإسكندرية",
+  "ميناء الدخيلة",
+  "ميناء دمياط",
+  "ميناء بورسعيد",
+  "ميناء السخنة",
+  "ميناء سفاجا",
+  "مطار القاهرة الدولي",
+  "مطار برج العرب",
+  "معبر السلوم",
+  "معبر قسطل",
+];
+
+export const navSections = [
+  {
+    title: "العمليات",
+    items: [
+      { href: "/dashboard", label: "لوحة التحكم", icon: "dashboard" },
+      { href: "/shipments", label: "ملفات التخليص", icon: "shipments" },
+      { href: "/tracking", label: "تتبع بوليصة / AWB", icon: "tracking" },
+      { href: "/documents", label: "المستندات", icon: "documents" },
+      { href: "/customs", label: "المنظومة الجمركية", icon: "customs" },
+      { href: "/invoices", label: "الفواتير والتحصيل", icon: "invoices" },
+    ],
+  },
+  {
+    title: "الشركاء والتكامل",
+    items: [
+      { href: "/carriers", label: "شركات الطيران والملاحة", icon: "carriers" },
+      { href: "/integrations", label: "الربط مع نافذة", icon: "integrations" },
+    ],
+  },
+  {
+    title: "الإدارة",
+    items: [
+      { href: "/clients", label: "العملاء", icon: "clients" },
+      { href: "/reports", label: "التقارير والتحليلات", icon: "reports" },
+      { href: "/settings", label: "الإعدادات", icon: "settings" },
+    ],
+  },
+] as const;

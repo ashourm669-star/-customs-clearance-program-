@@ -1,269 +1,314 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
-  Activity, Bell, Building2, ChevronDown, ClipboardList, ExternalLink, FileText, Globe2, KeyRound,
-  Landmark, LayoutDashboard, LogOut, Menu, Plane, Printer, ReceiptText, Scale, Search, Settings,
-  Ship, ShieldCheck, UsersRound, X, CircleCheck, ChartNoAxesCombined,
+  Bell,
+  Building2,
+  ChevronDown,
+  FileStack,
+  BookOpenCheck,
+  LayoutDashboard,
+  Radar,
+  LogOut,
+  Menu,
+  PackageSearch,
+  PieChart,
+  PlugZap,
+  Plus,
+  ReceiptText,
+  Search,
+  Settings,
+  Ship,
+  ShieldCheck,
+  X,
 } from "lucide-react";
-import { DataProvider, authHeaders, clearToken, useData, type Row } from "@/components/data-provider";
-import { PwaInstaller } from "@/components/pwa-installer";
-import { COMPANY, formatDateTime, statusLabel, roles } from "@/lib/constants";
+import { navSections } from "@/lib/constants";
+import type { SessionUser } from "@/lib/auth";
+import { Avatar } from "@/components/ui";
+import { InstallAppCard } from "@/components/pwa";
+import { ExportMenu } from "@/components/export-menu";
 
-type NavItem = { href: string; label: string; icon: typeof LayoutDashboard; badge?: "shipments" | "tasks" };
-type NavGroup = { title: string; items: NavItem[] };
+const icons: Record<string, ReactNode> = {
+  dashboard: <LayoutDashboard className="size-[18px]" />,
+  shipments: <PackageSearch className="size-[18px]" />,
+  tracking: <Radar className="size-[18px]" />,
+  documents: <FileStack className="size-[18px]" />,
+  customs: <BookOpenCheck className="size-[18px]" />,
+  invoices: <ReceiptText className="size-[18px]" />,
+  carriers: <Ship className="size-[18px]" />,
+  integrations: <PlugZap className="size-[18px]" />,
+  clients: <Building2 className="size-[18px]" />,
+  reports: <PieChart className="size-[18px]" />,
+  settings: <Settings className="size-[18px]" />,
+};
 
-const groups: NavGroup[] = [
-  { title: "الرئيسية", items: [{ href: "/dashboard", label: "لوحة التحكم", icon: LayoutDashboard }] },
-  {
-    title: "استعلام وبنود",
-    items: [
-      { href: "/lookup", label: "استعلام برقم بوليصة", icon: Search },
-      { href: "/tariff", label: "البند الجمركي", icon: Scale },
-      { href: "/clearance", label: "ملف التخليص الجمركي", icon: FileText },
-    ],
-  },
-  {
-    title: "العمليات الجمركية",
-    items: [
-      { href: "/shipments", label: "الشحنات والتخليص", icon: Ship, badge: "shipments" },
-      { href: "/tasks", label: "المهام", icon: ClipboardList, badge: "tasks" },
-      { href: "/documents", label: "المستندات", icon: FileText },
-      { href: "/nafeza", label: "منصة نافذة", icon: Activity },
-    ],
-  },
-  {
-    title: "الجهات والشركاء",
-    items: [
-      { href: "/clients", label: "العملاء", icon: Building2 },
-      { href: "/carriers", label: "الناقلون والخطوط", icon: Plane },
-      { href: "/connections", label: "ربط الناقلين API", icon: KeyRound },
-      { href: "/ports", label: "الموانئ والمنافذ", icon: Globe2 },
-    ],
-  },
-  {
-    title: "المالية والتقارير",
-    items: [
-      { href: "/invoices", label: "الفواتير", icon: ReceiptText },
-      { href: "/banks", label: "البنوك والسداد", icon: Landmark },
-      { href: "/reports", label: "التقارير والإحصاءات", icon: ChartNoAxesCombined },
-    ],
-  },
-  {
-    title: "النظام",
-    items: [
-      { href: "/users", label: "المستخدمون", icon: UsersRound },
-      { href: "/settings", label: "الإعدادات", icon: Settings },
-    ],
-  },
-];
+const pageTitles: Record<string, string> = {
+  "/dashboard": "لوحة التحكم",
+  "/shipments": "ملفات التخليص",
+  "/tracking": "تتبع بوليصة / AWB",
+  "/documents": "مركز المستندات",
+  "/customs": "المنظومة الجمركية",
+  "/invoices": "الفواتير والتحصيل",
+  "/carriers": "شركات الطيران والخطوط الملاحية",
+  "/integrations": "الربط والتكامل",
+  "/clients": "قاعدة العملاء",
+  "/reports": "التقارير والتحليلات",
+  "/settings": "الإعدادات",
+};
 
-function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
+export function AppShell({ user, children }: { user: SessionUser; children: ReactNode }) {
   const pathname = usePathname();
-  const { data } = useData();
-  return (
-    <div className="flex h-full flex-col bg-[linear-gradient(180deg,#071426_0%,#0b1d36_60%,#0d2a44_100%)] text-white">
+  const router = useRouter();
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onClick(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) setMenuOpen(false);
+    }
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, []);
+
+  const title = useMemo(() => {
+    if (pathname.startsWith("/shipments/")) return "تفاصيل ملف التخليص";
+    return pageTitles[pathname] ?? "العربي للخدمات الجمركية";
+  }, [pathname]);
+
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.replace("/login");
+    router.refresh();
+  }
+
+  function submitSearch(event: React.FormEvent) {
+    event.preventDefault();
+    if (!search.trim()) return;
+    router.push(`/shipments?q=${encodeURIComponent(search.trim())}`);
+  }
+
+  const sidebar = (
+    <div className="flex h-full flex-col bg-[linear-gradient(185deg,#0a2239_0%,#0d2f4f_58%,#0b3b47_100%)] text-slate-200">
       <div className="flex items-center gap-3 border-b border-white/10 px-5 py-5">
-        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-teal-400 to-emerald-600 shadow-lg shadow-teal-900/30">
-          <Building2 size={20} />
+        <div className="flex size-11 items-center justify-center rounded-xl bg-[linear-gradient(135deg,#c9a227,#ead07a)] text-[#0a2239] shadow-lg">
+          <ShieldCheck className="size-6" />
         </div>
         <div className="min-w-0">
-          <p className="truncate text-sm font-bold">الشركة العربي</p>
-          <p className="truncate text-[10px] text-white/50">التخليص الجمركي واللوجستيات</p>
+          <p className="truncate text-sm font-extrabold text-white">العربي للخدمات الجمركية</p>
+          <p className="truncate text-[11px] text-slate-300/80">واللوجستية · Al-Araby Clearance</p>
         </div>
+        <button
+          type="button"
+          className="mr-auto rounded-lg p-1.5 text-slate-300 hover:bg-white/10 lg:hidden"
+          onClick={() => setMobileOpen(false)}
+          aria-label="إغلاق القائمة"
+        >
+          <X className="size-5" />
+        </button>
       </div>
 
-      <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-5">
-        {groups.map((group) => (
-          <div key={group.title}>
-            <p className="mb-2 px-3 text-[10px] font-bold tracking-wide text-white/35">{group.title}</p>
-            <div className="space-y-1">
-              {group.items.map((item) => {
-                const active = pathname === item.href || pathname.startsWith(item.href + "/");
-                const count = item.badge === "shipments"
-                  ? data?.shipments.filter((s: Row) => !["delivered", "released"].includes(s.status)).length
-                  : item.badge === "tasks"
-                    ? data?.tasks.filter((t: Row) => t.status !== "done").length
-                    : undefined;
+      <nav className="scroll-thin flex-1 space-y-5 overflow-y-auto px-3 py-4">
+        {navSections.map((section) => (
+          <div key={section.title}>
+            <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400/70">{section.title}</p>
+            <ul className="space-y-1">
+              {section.items.map((item) => {
+                const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
                 return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={onNavigate}
-                    className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-[12.5px] font-semibold transition-all ${
-                      active
-                        ? "bg-gradient-to-l from-teal-500/25 to-teal-500/5 text-teal-200 shadow-[inset_-3px_0_0_#20c4a9]"
-                        : "text-white/65 hover:bg-white/5 hover:text-white"
-                    }`}
-                  >
-                    <item.icon size={17} className={active ? "text-teal-300" : ""} />
-                    <span className="flex-1">{item.label}</span>
-                    {count !== undefined && count > 0 && (
-                      <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-white/70">{count}</span>
-                    )}
-                  </Link>
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      onClick={() => {
+                        setMobileOpen(false);
+                        setMenuOpen(false);
+                      }}
+                      className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition ${
+                        active
+                          ? "bg-white/12 text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]"
+                          : "text-slate-300 hover:bg-white/[0.07] hover:text-white"
+                      }`}
+                    >
+                      <span className={active ? "text-[#7ee0cf]" : "text-slate-400 group-hover:text-slate-200"}>
+                        {icons[item.icon]}
+                      </span>
+                      <span className="truncate">{item.label}</span>
+                      {active ? <span className="mr-auto size-1.5 rounded-full bg-[#7ee0cf]" /> : null}
+                    </Link>
+                  </li>
                 );
               })}
-            </div>
+            </ul>
           </div>
         ))}
       </nav>
 
-      <div className="border-t border-white/10 p-4">
-        <div className="rounded-xl border border-teal-400/20 bg-teal-400/5 p-3">
-          <div className="flex items-center gap-2">
-            <CircleCheck size={15} className="text-teal-300" />
-            <p className="text-[11px] font-bold text-teal-100">الربط مع نافذة نشط</p>
-          </div>
-          <p className="mt-1.5 text-[10px] leading-5 text-white/45">آخر مزامنة: {data?.serverTime ? formatDateTime(data.serverTime) : "الآن"}</p>
+      <div className="mx-3 mb-3 rounded-xl border border-white/10 bg-white/[0.06] p-3">
+        <div className="flex items-center gap-2">
+          <span className="relative flex size-2">
+            <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-70" />
+            <span className="relative inline-flex size-2 rounded-full bg-emerald-400" />
+          </span>
+          <p className="text-[11px] font-bold text-white">نافذة · متصل</p>
+          <span className="mr-auto rounded-md bg-emerald-400/15 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300">
+            API v2
+          </span>
         </div>
-        <p className="mt-3 text-center text-[9px] text-white/30">الإصدار ٢٠٢٦.١ · جميع الحقوق محفوظة</p>
+        <p className="mt-1.5 text-[10px] leading-5 text-slate-300/80">
+          الربط مع الشباك الواحد و11 شركة شحن يعمل بكفاءة.
+        </p>
+      </div>
+
+      <div className="px-3 pb-2">
+        <InstallAppCard compact />
+      </div>
+
+      <div className="border-t border-white/10 px-4 py-3">
+        <div className="flex items-center gap-2.5">
+          <Avatar name={user.name} color={user.avatarColor} size="sm" />
+          <div className="min-w-0">
+            <p className="truncate text-xs font-bold text-white">{user.name}</p>
+            <p className="truncate text-[10px] text-slate-300/80">{user.jobTitle ?? "فريق العربي"}</p>
+          </div>
+        </div>
       </div>
     </div>
   );
-}
-
-function Topbar({ user, onMenu }: { user: Row; onMenu: () => void }) {
-  const pathname = usePathname();
-  const { data } = useData();
-  const [openNotifications, setOpenNotifications] = useState(false);
-  const [openUser, setOpenUser] = useState(false);
-  const [loggingOut, setLoggingOut] = useState(false);
-  const [embedded, setEmbedded] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  const current = groups.flatMap((g) => g.items).find((i) => pathname === i.href || pathname.startsWith(i.href + "/"));
-  const title = current?.label ?? "لوحة التحكم";
-  const shown: Row = data?.currentUser ?? user;
-
-  useEffect(() => {
-    setEmbedded(window.self !== window.top);
-    function close(event: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setOpenNotifications(false);
-        setOpenUser(false);
-      }
-    }
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
-  }, []);
-
-  async function logout() {
-    setLoggingOut(true);
-    await fetch("/api/auth/logout", { method: "POST", headers: authHeaders() });
-    clearToken();
-    window.location.replace("/login");
-  }
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-slate-200/80 bg-white/90 px-4 backdrop-blur-md sm:px-6">
-      <div className="flex items-center gap-3">
-        <button onClick={onMenu} className="rounded-lg border border-slate-200 p-2 text-slate-600 lg:hidden" aria-label="القائمة"><Menu size={18} /></button>
-        <div>
-          <h2 className="text-sm font-bold text-[var(--navy)] sm:text-base">{title}</h2>
-          <p className="hidden text-[10px] text-slate-400 sm:block">{COMPANY.name}</p>
+    <div className="min-h-screen">
+      <aside className="app-sidebar fixed inset-y-0 right-0 z-40 hidden w-[268px] lg:block">{sidebar}</aside>
+
+      {mobileOpen ? (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
+          <aside className="absolute inset-y-0 right-0 w-[280px] shadow-2xl">{sidebar}</aside>
         </div>
-      </div>
+      ) : null}
 
-      <div className="flex items-center gap-2" ref={menuRef}>
-        <button className="btn-ghost hidden px-2.5 py-2 sm:inline-flex" onClick={() => window.print()} title="طباعة / حفظ PDF"><Printer size={15} /> طباعة</button>
-        <Link href="/lookup" className="hidden items-center gap-2 rounded-xl border border-teal-200 bg-teal-50 px-3 py-2 text-[11px] font-bold text-teal-800 xl:flex">
-          <Search size={14} /> استعلام بوليصة
-        </Link>
-
-        {embedded && (
-          <button
-            onClick={() => window.open(window.location.href, "_blank", "noopener")}
-            className="hidden items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-2 text-[10px] font-bold text-amber-700 hover:bg-amber-100 sm:inline-flex"
-            title="فتح التطبيق في تبويب جديد"
-          >
-            <ExternalLink size={13} /> فتح في تبويب جديد
-          </button>
-        )}
-
-        <div className="relative">
-          <button onClick={() => { setOpenNotifications((v) => !v); setOpenUser(false); }} className="relative rounded-xl border border-slate-200 p-2 text-slate-500 hover:bg-slate-50" aria-label="الإشعارات">
-            <Bell size={17} />
-            {(data?.activities?.length ?? 0) > 0 && <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-white" />}
-          </button>
-          {openNotifications && (
-            <div className="fade-up absolute end-0 top-12 w-[min(330px,calc(100vw-30px))] rounded-2xl border border-slate-200 bg-white p-3 shadow-xl shadow-slate-900/10">
-              <p className="mb-2 px-1 text-xs font-bold text-[var(--navy)]">آخر النشاطات</p>
-              <div className="max-h-72 space-y-1 overflow-y-auto">
-                {(data?.activities ?? []).slice(0, 6).map((activity: Row) => (
-                  <div key={activity.id} className="flex gap-2.5 rounded-xl p-2 hover:bg-slate-50">
-                    <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-teal-500" />
-                    <div className="min-w-0">
-                      <p className="line-clamp-1 text-[11px] font-semibold text-slate-700">{activity.description}</p>
-                      <p className="mt-0.5 text-[10px] text-slate-400">{activity.actor} · {formatDateTime(activity.createdAt)}</p>
-                    </div>
-                  </div>
-                ))}
-                {(data?.activities?.length ?? 0) === 0 && <p className="py-6 text-center text-[11px] text-slate-400">لا توجد نشاطات بعد</p>}
-              </div>
+      <div className="app-content lg:mr-[268px]">
+        <header className="app-topbar sticky top-0 z-30 border-b border-slate-200/80 bg-white/85 backdrop-blur-md">
+          <div className="flex h-16 items-center gap-3 px-4 sm:px-6">
+            <button
+              type="button"
+              className="rounded-lg border border-slate-200 p-2 text-slate-600 lg:hidden"
+              onClick={() => setMobileOpen(true)}
+              aria-label="القائمة"
+            >
+              <Menu className="size-5" />
+            </button>
+            <div className="hidden min-w-0 sm:block">
+              <h2 className="truncate text-sm font-bold text-slate-900">{title}</h2>
+              <p className="text-[11px] text-slate-500">
+                {new Intl.DateTimeFormat("ar-EG-u-nu-latn", {
+                  weekday: "long",
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                }).format(new Date())}
+              </p>
             </div>
-          )}
-        </div>
 
-        <div className="relative">
-          <button onClick={() => { setOpenUser((v) => !v); setOpenNotifications(false); }} className="flex items-center gap-2 rounded-xl border border-slate-200 px-2 py-1.5 hover:bg-slate-50">
-            <div className="grid h-8 w-8 place-items-center rounded-lg bg-[var(--navy)] text-[11px] font-bold text-white">{String(shown.name ?? "ع").slice(0, 1)}</div>
-            <div className="hidden text-right sm:block">
-              <p className="text-[11px] font-bold text-slate-700">{shown.name}</p>
-              <p className="text-[10px] text-slate-400">{statusLabel(roles, shown.role)}</p>
-            </div>
-            <ChevronDown size={13} className="text-slate-400" />
-          </button>
-          {openUser && (
-            <div className="fade-up absolute end-0 top-12 w-56 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl shadow-slate-900/10">
-              <div className="border-b border-slate-100 px-3 py-2">
-                <p className="text-xs font-bold text-slate-700">{shown.name}</p>
-                <p dir="ltr" className="mt-0.5 truncate text-right text-[10px] text-slate-400">{shown.email}</p>
-              </div>
-              <Link href="/settings" onClick={() => setOpenUser(false)} className="mt-1 flex items-center gap-2 rounded-lg px-3 py-2 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"><Settings size={14} /> إعدادات الشركة</Link>
-              <button onClick={() => void logout()} disabled={loggingOut} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[11px] font-semibold text-rose-600 hover:bg-rose-50 disabled:opacity-60">
-                <LogOut size={14} /> {loggingOut ? "جاري الخروج..." : "تسجيل الخروج"}
+            <form onSubmit={submitSearch} className="relative mr-auto w-full max-w-xs">
+              <Search className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="بحث برقم الملف، البوليصة…"
+                className="input h-10 pr-9 text-xs"
+              />
+            </form>
+
+            <ExportMenu />
+
+            <Link href="/shipments?new=1" className="btn btn-mint hidden h-10 px-3 text-xs sm:inline-flex">
+              <Plus className="size-4" />
+              ملف تخليص
+            </Link>
+
+            <Link
+              href="/integrations"
+              className="relative hidden rounded-lg border border-slate-200 p-2 text-slate-600 transition hover:bg-slate-50 md:block"
+              aria-label="الإشعارات"
+            >
+              <Bell className="size-5" />
+              <span className="absolute -left-0.5 -top-0.5 flex size-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-bold text-white">
+                3
+              </span>
+            </Link>
+
+            <div className="relative" ref={menuRef}>
+              <button
+                type="button"
+                onClick={() => setMenuOpen((open) => !open)}
+                className="flex items-center gap-2 rounded-xl border border-slate-200 p-1 pl-2 transition hover:bg-slate-50"
+              >
+                <ChevronDown className="size-4 text-slate-400" />
+                <span className="hidden text-right sm:block">
+                  <span className="block text-[11px] font-bold leading-4 text-slate-800">{user.name}</span>
+                  <span className="block text-[10px] leading-3 text-slate-500">{user.email}</span>
+                </span>
+                <Avatar name={user.name} color={user.avatarColor} size="sm" />
               </button>
+              {menuOpen ? (
+                <div className="absolute left-0 top-12 z-40 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl animate-fade-up">
+                  <div className="border-b border-slate-100 px-3 py-2">
+                    <p className="text-xs font-bold text-slate-900">{user.name}</p>
+                    <p className="text-[11px] text-slate-500">{user.jobTitle ?? "فريق العربي"}</p>
+                  </div>
+                  <Link href="/settings" className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                    <Settings className="size-4 text-slate-400" />
+                    إعدادات الحساب
+                  </Link>
+                  <Link href="/integrations" className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                    <PlugZap className="size-4 text-slate-400" />
+                    حالة التكاملات
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={logout}
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-right text-xs font-semibold text-rose-600 hover:bg-rose-50"
+                  >
+                    <LogOut className="size-4" />
+                    تسجيل الخروج
+                  </button>
+                </div>
+              ) : null}
             </div>
-          )}
-        </div>
-      </div>
-    </header>
-  );
-}
-
-export function AppShell({ user, children }: { user: Row; children: ReactNode }) {
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const pathname = usePathname();
-
-  useEffect(() => { setMobileOpen(false); }, [pathname]);
-
-  return (
-    <DataProvider>
-      <div className="min-h-screen bg-[#f4f7fb]">
-        <aside className="fixed inset-y-0 right-0 z-40 hidden w-64 lg:block">
-          <SidebarContent />
-        </aside>
-        {mobileOpen && (
-          <div className="fixed inset-0 z-50 lg:hidden">
-            <button className="absolute inset-0 bg-slate-900/50 backdrop-blur-[2px]" onClick={() => setMobileOpen(false)} aria-label="إغلاق القائمة" />
-            <aside className="slide-in absolute inset-y-0 right-0 w-72 shadow-2xl">
-              <button onClick={() => setMobileOpen(false)} className="absolute left-3 top-5 z-10 rounded-lg bg-white/10 p-1.5 text-white" aria-label="إغلاق"><X size={16} /></button>
-              <SidebarContent onNavigate={() => setMobileOpen(false)} />
-            </aside>
           </div>
-        )}
-        <div className="lg:pr-64">
-          <Topbar user={user} onMenu={() => setMobileOpen(true)} />
-          <main className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6 sm:py-7">{children}</main>
-          <footer className="border-t border-slate-200/70 px-6 py-4 text-center text-[10px] text-slate-400">
-            <span className="inline-flex items-center gap-1.5"><ShieldCheck size={12} /> {COMPANY.license}</span>
-          </footer>
-        </div>
-        <PwaInstaller />
+        </header>
+
+        <main className="app-safe-bottom px-4 pb-24 pt-5 sm:px-6 sm:pt-6 lg:pb-8">{children}</main>
+
+        <nav className="mobile-bottom-nav fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur-md safe-bottom lg:hidden">
+          <div className="grid grid-cols-5">
+            {[
+              { href: "/dashboard", label: "الرئيسية", icon: <LayoutDashboard className="size-[18px]" /> },
+              { href: "/shipments", label: "الملفات", icon: <PackageSearch className="size-[18px]" /> },
+              { href: "/tracking", label: "تتبع", icon: <Radar className="size-[18px]" /> },
+              { href: "/documents", label: "مستندات", icon: <FileStack className="size-[18px]" /> },
+              { href: "/invoices", label: "فواتير", icon: <ReceiptText className="size-[18px]" /> },
+            ].map((tab) => {
+              const active = pathname === tab.href || pathname.startsWith(`${tab.href}/`);
+              return (
+                <Link
+                  key={tab.href}
+                  href={tab.href}
+                  className={`flex flex-col items-center gap-0.5 py-2.5 text-[10px] font-bold transition ${
+                    active ? "text-[#0f9d8b]" : "text-slate-400"
+                  }`}
+                >
+                  <span className={active ? "text-[#0f9d8b]" : "text-slate-400"}>{tab.icon}</span>
+                  {tab.label}
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
       </div>
-    </DataProvider>
+    </div>
   );
 }

@@ -1,0 +1,30 @@
+services:
+  db:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: alarabi
+      POSTGRES_PASSWORD: change-me-strong-password
+      POSTGRES_DB: alarabi_customs
+    volumes:
+      - alarabi_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U alarabi -d alarabi_customs"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://alarabi:change-me-strong-password@db:5432/alarabi_customs
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+
+volumes:
+  alarabi_db:

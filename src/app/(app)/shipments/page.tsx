@@ -1,29 +1,28 @@
-"use client";
+import { listCarriers, listClients, listShipments } from "@/lib/queries";
+import { requireUser } from "@/lib/auth";
+import { ShipmentsClient } from "./shipments-client";
 
-import { useState } from "react";
-import Link from "next/link";
-import { FileSearch } from "lucide-react";
-import { ResourcePage } from "@/components/resource-page";
-import { ShipmentDrawer } from "@/components/shipment-drawer";
-import { pageConfigs } from "@/lib/ui-config";
-import type { Row } from "@/components/data-provider";
+export const dynamic = "force-dynamic";
 
-export default function ShipmentsPage() {
-  const [selected, setSelected] = useState<Row | null>(null);
+export default async function ShipmentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; status?: string; new?: string; bl?: string }>;
+}) {
+  const params = await searchParams;
+  const user = await requireUser();
+  const [shipments, clients, carriers] = await Promise.all([listShipments(), listClients(), listCarriers()]);
+
   return (
-    <>
-      <ResourcePage
-        config={pageConfigs.shipments}
-        onRowClick={setSelected}
-        extraActions={
-          <>
-            <Link href="/clearance" className="btn-primary"><FileSearch size={15} /> ملف تخليص جديد</Link>
-            <Link href="/lookup" className="btn-ghost">استعلام بوليصة</Link>
-            <Link href="/tariff" className="btn-ghost">البند الجمركي</Link>
-          </>
-        }
-      />
-      <ShipmentDrawer shipment={selected} onClose={() => setSelected(null)} />
-    </>
+    <ShipmentsClient
+      initialShipments={shipments}
+      clients={clients.map((client) => ({ id: client.id, name: client.name }))}
+      carriers={carriers.map((carrier) => ({ id: carrier.id, name: carrier.name }))}
+      initialQuery={params.q ?? ""}
+      initialStatus={params.status ?? "all"}
+      openCreate={params.new === "1" || Boolean(params.bl)}
+      prefillBl={params.bl ?? ""}
+      userName={user.name}
+    />
   );
 }

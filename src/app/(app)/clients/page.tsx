@@ -1,7 +1,9 @@
-"use client";
-import { ResourcePage } from "@/components/resource-page";
-import { pageConfigs } from "@/lib/ui-config";
+import { listClients } from "@/lib/queries";
+import { ClientsClient } from "./clients-client";
 
-export default function ClientsPage() {
-  return <ResourcePage config={pageConfigs.clients} />;
+export const dynamic = "force-dynamic";
+
+export default async function ClientsPage() {
+  const clients = await listClients();
+  return <ClientsClient initialClients={clients} />;
 }

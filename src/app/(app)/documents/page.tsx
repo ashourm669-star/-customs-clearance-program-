@@ -1,7 +1,18 @@
-"use client";
-import { ResourcePage } from "@/components/resource-page";
-import { pageConfigs } from "@/lib/ui-config";
+import { listDocuments, listShipments } from "@/lib/queries";
+import { DocumentsClient } from "./documents-client";
 
-export default function DocumentsPage() {
-  return <ResourcePage config={pageConfigs.documents} />;
+export const dynamic = "force-dynamic";
+
+export default async function DocumentsPage() {
+  const [documents, shipments] = await Promise.all([listDocuments(), listShipments()]);
+  return (
+    <DocumentsClient
+      initialDocuments={documents}
+      shipments={shipments.map((shipment) => ({
+        id: shipment.id,
+        reference: shipment.reference,
+        clientName: shipment.clientName,
+      }))}
+    />
+  );
 }
