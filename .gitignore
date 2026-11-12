@@ -1,0 +1,24 @@
+# Dependencies and build output
+node_modules/
+.next/
+out/
+build/
+*.tsbuildinfo
+
+# Secret credentials - NEVER commit
+.env
+.env.*
+!.env.example
+.vercel/
+
+# Local files and logs
+*.log
+npm-debug.log*
+.DS_Store
+/tmp/
+
+# Generated local database dumps
+*.sql
+*.dump
+*.sqlite
+*.db
