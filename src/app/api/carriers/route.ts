@@ -40,6 +40,10 @@ export async function POST(request: Request) {
       integrationStatus,
       color: asString(payload.color, "#0b2545") || "#0b2545",
       notes: asOptionalString(payload.notes),
+      trackingUrl: asOptionalString(payload.trackingUrl),
+      apiKey: asOptionalString(payload.apiKey),
+      apiSecret: asOptionalString(payload.apiSecret),
+      providerSlug: null,
       lastSyncAt: integrationStatus === "connected" ? new Date() : null,
     })
     .returning({ id: carriers.id });

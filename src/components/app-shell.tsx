@@ -22,6 +22,8 @@ import {
   Settings,
   Ship,
   ShieldCheck,
+  Users,
+  BellRing,
   X,
 } from "lucide-react";
 import { navSections } from "@/lib/constants";
@@ -42,6 +44,8 @@ const icons: Record<string, ReactNode> = {
   clients: <Building2 className="size-[18px]" />,
   reports: <PieChart className="size-[18px]" />,
   settings: <Settings className="size-[18px]" />,
+  users: <Users className="size-[18px]" />,
+  alerts: <BellRing className="size-[18px]" />,
 };
 
 const pageTitles: Record<string, string> = {
@@ -56,9 +60,11 @@ const pageTitles: Record<string, string> = {
   "/clients": "قاعدة العملاء",
   "/reports": "التقارير والتحليلات",
   "/settings": "الإعدادات",
+  "/users": "المستخدمون والصلاحيات",
+  "/alerts": "الإشعارات والتنبيهات",
 };
 
-export function AppShell({ user, children }: { user: SessionUser; children: ReactNode }) {
+export function AppShell({ user, alertsCount = 0, children }: { user: SessionUser; alertsCount?: number; children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -230,14 +236,16 @@ export function AppShell({ user, children }: { user: SessionUser; children: Reac
             </Link>
 
             <Link
-              href="/integrations"
-              className="relative hidden rounded-lg border border-slate-200 p-2 text-slate-600 transition hover:bg-slate-50 md:block"
+              href="/alerts"
+              className="relative rounded-lg border border-slate-200 p-2 text-slate-600 transition hover:bg-slate-50"
               aria-label="الإشعارات"
             >
               <Bell className="size-5" />
-              <span className="absolute -left-0.5 -top-0.5 flex size-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-bold text-white">
-                3
-              </span>
+              {alertsCount > 0 ? (
+                <span className="absolute -left-0.5 -top-0.5 flex min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white">
+                  {alertsCount > 9 ? "9+" : alertsCount}
+                </span>
+              ) : null}
             </Link>
 
             <div className="relative" ref={menuRef}>

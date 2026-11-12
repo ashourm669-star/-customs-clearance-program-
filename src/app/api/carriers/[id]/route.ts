@@ -42,6 +42,9 @@ export async function PATCH(request: Request, { params }: Params) {
         : {}),
       ...(payload.color !== undefined ? { color: asString(payload.color, "#0b2545") } : {}),
       ...(payload.notes !== undefined ? { notes: asOptionalString(payload.notes) } : {}),
+      ...(payload.trackingUrl !== undefined ? { trackingUrl: asOptionalString(payload.trackingUrl) } : {}),
+      ...(payload.apiKey !== undefined ? { apiKey: asOptionalString(payload.apiKey) } : {}),
+      ...(payload.apiSecret !== undefined ? { apiSecret: asOptionalString(payload.apiSecret) } : {}),
     })
     .where(eq(carriers.id, carrierId));
 

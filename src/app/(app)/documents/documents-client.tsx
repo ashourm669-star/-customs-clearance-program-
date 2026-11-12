@@ -11,6 +11,7 @@ import {
   Plus,
   Search,
   ShieldAlert,
+  Camera,
   Trash2,
   Upload,
   X,
@@ -63,6 +64,25 @@ export function DocumentsClient({
     }),
     [documents],
   );
+
+  async function captureDocument(file: File) {
+    const activeShipment = shipments[0];
+    if (!activeShipment) { toast({ title: "لا يوجد ملف تخليص لإضافة الصورة إليه", tone: "error" }); return; }
+    setSaving(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("shipmentId", String(activeShipment.id));
+      formData.append("name", file.name || `صورة مستند ${new Date().toLocaleString("ar-EG")}`);
+      const response = await fetch("/api/documents/upload", { method: "POST", body: formData });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "تعذّر رفع الصورة");
+      setDocuments((current) => [data.document, ...current]);
+      toast({ title: "تم رفع الصورة وتصنيفها كمستند", description: `${activeShipment.reference} — بانتظار المراجعة`, tone: "success" });
+      router.refresh();
+    } catch (caught) { toast({ title: "تعذّر رفع الصورة", description: caught instanceof Error ? caught.message : undefined, tone: "error" }); }
+    finally { setSaving(false); }
+  }
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -150,6 +170,15 @@ export function DocumentsClient({
   return (
     <div>
       <PageHeader title="مركز المستندات" description="كل مستندات التخليص في مكان واحد: فواتير، بوالص، شهادات منشأ وتصاريح.">
+        <label className="btn btn-ghost cursor-pointer">
+          <Camera className="size-4" />
+          تصوير مستند
+          <input type="file" accept="image/*" capture="environment" className="hidden" onChange={async (event) => {
+            const file = event.target.files?.[0];
+            if (!file) return;
+            await captureDocument(file);
+          }} />
+        </label>
         <button type="button" onClick={() => setOpen(true)} className="btn btn-primary">
           <Plus className="size-4" />
           تسجيل مستند

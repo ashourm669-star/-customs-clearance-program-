@@ -28,11 +28,13 @@ export function SettingsClient({
   roleLabel,
   stats,
   storage,
+  company,
 }: {
   user: SessionUser;
   roleLabel: string;
   stats: { shipments: number; clients: number; carriers: number; invoices: number; documents: number };
   storage: StorageStats;
+  company: Record<string, string>;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -43,6 +45,32 @@ export function SettingsClient({
     avatarColor: user.avatarColor,
   });
   const [passwords, setPasswords] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
+  const [email, setEmail] = useState(user.email);
+  const [companyForm, setCompanyForm] = useState({
+    company_name: company.company_name ?? "العربي للخدمات الجمركية واللوجستية",
+    company_name_en: company.company_name_en ?? "Al-Araby Customs & Logistics Services",
+    commercial_register: company.commercial_register ?? "364",
+    tax_id: company.tax_id ?? "439942616",
+    customs_license: company.customs_license ?? "EG-CB-10942",
+    phone: company.phone ?? "+20 3 480 2244",
+    email: company.email ?? "info@alarabi-logistics.com",
+    address: company.address ?? "الإسكندرية، مصر",
+    website: company.website ?? "",
+  });
+  const [savingCompany, setSavingCompany] = useState(false);
+
+  async function saveCompany(event: React.FormEvent) {
+    event.preventDefault();
+    setSavingCompany(true);
+    try {
+      const response = await fetch("/api/settings/company", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(companyForm) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "تعذّر الحفظ");
+      toast({ title: "تم حفظ بيانات المنشأة", description: `سجل تجاري ${companyForm.commercial_register} · ضريبي ${companyForm.tax_id}`, tone: "success" });
+      router.refresh();
+    } catch (error) { toast({ title: "تعذّر الحفظ", description: error instanceof Error ? error.message : undefined, tone: "error" }); }
+    finally { setSavingCompany(false); }
+  }
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
 
@@ -53,7 +81,7 @@ export function SettingsClient({
       const response = await fetch("/api/settings/profile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(profile),
+        body: JSON.stringify({ ...profile, email }),
       });
       const data = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(data.error ?? "");
@@ -130,8 +158,8 @@ export function SettingsClient({
                 <Field label="رقم الهاتف">
                   <input className="input" dir="ltr" value={profile.phone} onChange={(event) => setProfile({ ...profile, phone: event.target.value })} />
                 </Field>
-                <Field label="البريد الإلكتروني" hint="للتعديل تواصل مع مدير النظام">
-                  <input className="input bg-slate-50" value={user.email} readOnly />
+                <Field label="البريد الإلكتروني" hint="يمكنك تغييره بنفسك — يُستخدم في تسجيل الدخول">
+                  <input type="email" dir="ltr" className="input" value={email} onChange={(event) => setEmail(event.target.value)} />
                 </Field>
               </div>
 
@@ -187,6 +215,20 @@ export function SettingsClient({
 
         <div className="space-y-5">
           <InstallAppCard />
+
+          <SectionCard title="بيانات المنشأة" description="السجل التجاري والرقم الضريبي يظهران في السندات والفواتير المطبوعة" bodyClassName="p-5">
+            <form onSubmit={saveCompany} className="grid gap-3 sm:grid-cols-2">
+              <Field label="اسم المنشأة"><input className="input" value={companyForm.company_name} onChange={(event) => setCompanyForm({ ...companyForm, company_name: event.target.value })} /></Field>
+              <Field label="الاسم بالإنجليزية"><input className="input" dir="ltr" value={companyForm.company_name_en} onChange={(event) => setCompanyForm({ ...companyForm, company_name_en: event.target.value })} /></Field>
+              <Field label="رقم السجل التجاري" required><input className="input" dir="ltr" value={companyForm.commercial_register} onChange={(event) => setCompanyForm({ ...companyForm, commercial_register: event.target.value })} required /></Field>
+              <Field label="الرقم الضريبي" required><input className="input" dir="ltr" value={companyForm.tax_id} onChange={(event) => setCompanyForm({ ...companyForm, tax_id: event.target.value })} required /></Field>
+              <Field label="رقم ترخيص المخلص"><input className="input" dir="ltr" value={companyForm.customs_license} onChange={(event) => setCompanyForm({ ...companyForm, customs_license: event.target.value })} /></Field>
+              <Field label="الهاتف"><input className="input" dir="ltr" value={companyForm.phone} onChange={(event) => setCompanyForm({ ...companyForm, phone: event.target.value })} /></Field>
+              <Field label="البريد الرسمي"><input className="input" dir="ltr" value={companyForm.email} onChange={(event) => setCompanyForm({ ...companyForm, email: event.target.value })} /></Field>
+              <Field label="العنوان"><input className="input" value={companyForm.address} onChange={(event) => setCompanyForm({ ...companyForm, address: event.target.value })} /></Field>
+              <div className="sm:col-span-2 flex justify-end"><button type="submit" className="btn btn-primary" disabled={savingCompany}>{savingCompany ? <Spinner /> : <Save className="size-4" />} حفظ بيانات المنشأة</button></div>
+            </form>
+          </SectionCard>
 
           <SectionCard title="المنشأة" bodyClassName="p-5">
             <div className="flex items-center gap-3">

@@ -13,7 +13,22 @@ export async function seedCustomsReference() {
   await db.insert(banks).values([
     { name: "البنك الأهلي المصري", nameEn: "National Bank of Egypt", code: "NBE", swift: "NBEGEGCX", currency: "EGP", accountName: "العربي للخدمات الجمركية واللوجستية", status: "manual", notes: "بيانات مرجعية — أضف حساب الشركة الحقيقي قبل استخدامها في التحصيل." },
     { name: "البنك التجاري الدولي", nameEn: "Commercial International Bank", code: "CIB", swift: "CIBEEGCX", currency: "EGP", accountName: "العربي للخدمات الجمركية واللوجستية", status: "manual", notes: "السويفت مرجع عام؛ لا يوجد ربط بنكي فعلي في هذه النسخة." },
-    { name: "بنك الإسكندرية", nameEn: "Alexandria Bank", code: "ALEX", swift: "ALEXEGX", currency: "EGP", status: "manual", notes: "أضف بيانات الحساب المعتمد." },
+    { name: "بنك القاهرة", nameEn: "Banque du Caire", code: "BDC", swift: "BCAIEGCX", currency: "EGP", status: "manual", notes: "بيانات مرجعية عامة — أضف حساب الشركة قبل الاستخدام." },
+    { name: "بنك مصر", nameEn: "Banque Misr", code: "BM", swift: "BMISEGCX", currency: "EGP", status: "manual", notes: "بيانات مرجعية عامة." },
+    { name: "بنك قطر الوطني الأهلي", nameEn: "QNB Alahli", code: "QNBA", swift: "QNBAEGCX", currency: "EGP", status: "manual", notes: "بيانات مرجعية عامة." },
+    { name: "البنك العربي الأفريقي الدولي", nameEn: "Arab African International Bank", code: "AAIB", swift: "ARAIEGCX", currency: "EGP", status: "manual", notes: "بيانات مرجعية عامة." },
+    { name: "بنك HSBC مصر", nameEn: "HSBC Egypt", code: "HSBC", swift: "BMECEGCX", currency: "USD", status: "manual", notes: "بيانات مرجعية عامة." },
+    { name: "بنك الإسكندرية", nameEn: "Alex Bank", code: "ALEX", swift: "ALEXEGCX", currency: "EGP", status: "manual", notes: "بيانات مرجعية عامة." },
+    { name: "بنك saib", nameEn: "SAIB Bank", code: "SAIB", swift: "SAIBEGCX", currency: "EGP", status: "manual", notes: "بيانات مرجعية عامة." },
+    { name: "بنك الكويت الوطني مصر", nameEn: "NBK Egypt", code: "NBK", swift: "NBKEEGCX", currency: "EGP", status: "manual", notes: "بيانات مرجعية عامة." },
+    { name: "بنك الاستثمار العربي", nameEn: "Arab Investment Bank", code: "AIB", swift: "AIBEEGCX", currency: "EGP", status: "manual", notes: "بيانات مرجعية عامة." },
+    { name: "بنك التنمية الصناعية", nameEn: "Industrial Development Bank", code: "IDB", swift: "IDBEEGCX", currency: "EGP", status: "manual", notes: "بيانات مرجعية عامة." },
+    { name: "البنك الزراعي المصري", nameEn: "Agricultural Bank of Egypt", code: "ABE", swift: "ABEGEGCX", currency: "EGP", status: "manual", notes: "بيانات مرجعية عامة." },
+    { name: "بنك فيصل الإسلامي المصري", nameEn: "Faisal Islamic Bank of Egypt", code: "FIB", swift: "FIBAEGCX", currency: "EGP", status: "manual", notes: "بيانات مرجعية عامة." },
+    { name: "بنك البركة مصر", nameEn: "Al Baraka Bank Egypt", code: "ALBRK", swift: "ALBREGCX", currency: "EGP", status: "manual", notes: "بيانات مرجعية عامة." },
+    { name: "بنك الإمارات دبي الوطني مصر", nameEn: "Emirates NBD Egypt", code: "ENBD", swift: "EBILAEAD", currency: "USD", status: "manual", notes: "بيانات مرجعية عامة للتحويلات الدولية." },
+    { name: "البنك الأهلي الكويتي", nameEn: "Al Ahli Bank of Kuwait", code: "ABK", swift: "ABKHEGCA", currency: "EGP", status: "manual", notes: "بيانات مرجعية عامة." },
+    { name: "بنك مصر إيران للتنمية", nameEn: "MID Bank", code: "MIDB", swift: "MIDBEGCX", currency: "EGP", status: "manual", notes: "بيانات مرجعية عامة." },
   ]).onConflictDoNothing();
 
   const codes = [

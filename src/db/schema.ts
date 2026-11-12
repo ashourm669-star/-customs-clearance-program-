@@ -9,6 +9,8 @@ export const users = pgTable("users", {
   jobTitle: text("job_title").default("مخلص جمركي"),
   phone: text("phone"),
   avatarColor: text("avatar_color").notNull().default("#0f9d8b"),
+  permissions: jsonb("permissions").$type<string[]>().default([]),
+  active: integer("active").notNull().default(1),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -50,6 +52,11 @@ export const carriers = pgTable("carriers", {
   shipmentsSynced: integer("shipments_synced").notNull().default(0),
   color: text("color").notNull().default("#0b2545"),
   notes: text("notes"),
+  providerSlug: text("provider_slug"),
+  trackingUrl: text("tracking_url"),
+  apiKey: text("api_key"),
+  apiSecret: text("api_secret"),
+  credentialNote: text("credential_note"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -271,3 +278,20 @@ export type ShipmentEvent = typeof shipmentEvents.$inferSelect;
 export type DocumentRow = typeof documents.$inferSelect;
 export type Invoice = typeof invoices.$inferSelect;
 export type IntegrationLog = typeof integrationLogs.$inferSelect;
+
+export const appSettings = pgTable("app_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const auditLogs = pgTable("audit_logs", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id, { onDelete: "set null" }),
+  actorName: text("actor_name"),
+  action: text("action").notNull(),
+  entity: text("entity"),
+  entityId: integer("entity_id"),
+  details: text("details"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});

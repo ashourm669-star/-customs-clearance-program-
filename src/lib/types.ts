@@ -69,6 +69,9 @@ export type CarrierRow = {
   shipmentsSynced: number;
   color: string;
   notes: string | null;
+  trackingUrl: string | null;
+  apiKey: string | null;
+  apiSecret: string | null;
   createdAt: string;
   activeShipments: number;
   totalShipments: number;

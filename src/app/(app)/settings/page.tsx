@@ -3,19 +3,21 @@ import { db } from "@/db";
 import { carriers, clients, documents, invoices, shipments } from "@/db/schema";
 import { requireUser, ROLE_LABELS } from "@/lib/auth";
 import { getStorageStats } from "@/lib/storage";
+import { getAppSettings } from "@/lib/queries";
 import { SettingsClient } from "./settings-client";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
   const user = await requireUser();
-  const [shipmentCount, clientCount, carrierCount, invoiceCount, documentCount, storage] = await Promise.all([
+  const [shipmentCount, clientCount, carrierCount, invoiceCount, documentCount, storage, company] = await Promise.all([
     db.select({ total: count() }).from(shipments),
     db.select({ total: count() }).from(clients),
     db.select({ total: count() }).from(carriers),
     db.select({ total: count() }).from(invoices),
     db.select({ total: count() }).from(documents),
     getStorageStats(),
+    getAppSettings(),
   ]);
 
   return (
@@ -23,6 +25,7 @@ export default async function SettingsPage() {
       user={user}
       roleLabel={ROLE_LABELS[user.role] ?? user.role}
       storage={storage}
+      company={company}
       stats={{
         shipments: Number(shipmentCount[0]?.total ?? 0),
         clients: Number(clientCount[0]?.total ?? 0),

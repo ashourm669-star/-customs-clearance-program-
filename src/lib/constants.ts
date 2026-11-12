@@ -150,6 +150,8 @@ export const navSections = [
     items: [
       { href: "/clients", label: "العملاء", icon: "clients" },
       { href: "/reports", label: "التقارير والتحليلات", icon: "reports" },
+      { href: "/users", label: "المستخدمون والصلاحيات", icon: "users" },
+      { href: "/alerts", label: "الإشعارات والتنبيهات", icon: "alerts" },
       { href: "/settings", label: "الإعدادات", icon: "settings" },
     ],
   },

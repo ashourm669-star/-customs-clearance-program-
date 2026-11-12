@@ -12,6 +12,27 @@ function reference(prefix: string): string {
   return `${prefix}-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 }
 
+async function callRealProvider(carrier: { trackingUrl: string | null; apiKey: string | null; apiSecret: string | null }, blQuery: string): Promise<{ ok: boolean; status: number; body: string } | null> {
+  if (!carrier.trackingUrl || !carrier.apiKey) return null;
+  try {
+    const url = new URL(carrier.trackingUrl);
+    url.searchParams.set("query", blQuery);
+    const response = await fetch(url.toString(), {
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${carrier.apiKey}`,
+        "X-Access-Token": carrier.apiKey,
+        ...(carrier.apiSecret ? { "X-Api-Secret": carrier.apiSecret } : {}),
+      },
+      signal: AbortSignal.timeout(15_000),
+      cache: "no-store",
+    });
+    return { ok: response.ok, status: response.status, body: (await response.text()).slice(0, 500) };
+  } catch (error) {
+    return { ok: false, status: 0, body: error instanceof Error ? error.message : "network error" };
+  }
+}
+
 export async function syncCarrier(carrierId: number, actor: string): Promise<SyncResult> {
   const rows = await db.select().from(carriers).where(eq(carriers.id, carrierId)).limit(1);
   const carrier = rows[0];
@@ -39,6 +60,19 @@ export async function syncCarrier(carrierId: number, actor: string): Promise<Syn
       reference: reference("SYNC-PEND"),
     });
     return { ok: true, message, level: "warning" };
+  }
+
+  // Real HTTP call when the company has stored its own credentials.
+  const sample = await db.select({ bl: shipments.blNumber }).from(shipments).where(eq(shipments.carrierId, carrierId)).limit(1);
+  const probe = await callRealProvider(carrier, sample[0]?.bl ?? "TEST");
+  if (probe) {
+    const status = probe.ok ? "success" : "error";
+    const message = probe.ok
+      ? `${carrier.name}: استجابة حقيقية من ${carrier.trackingUrl} (HTTP ${probe.status}) — ${probe.body.slice(0, 160)}`
+      : `${carrier.name}: فشل الاتصال ببوابة الشركة (HTTP ${probe.status}) — ${probe.body.slice(0, 160)}`;
+    await db.insert(integrationLogs).values({ carrierId, kind: "carrier_sync", status, message, reference: `LIVE-${Date.now().toString().slice(-6)}` });
+    await db.update(carriers).set({ lastSyncAt: new Date() }).where(eq(carriers.id, carrierId));
+    return { ok: probe.ok, message, level: probe.ok ? "success" : "error" };
   }
 
   const pulled = 2 + Math.floor(Math.random() * 9);

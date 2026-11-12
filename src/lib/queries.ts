@@ -1,6 +1,8 @@
 import { and, asc, count, desc, eq, gte, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
+  appSettings,
+  auditLogs,
   carriers,
   clients,
   documents,
@@ -8,6 +10,7 @@ import {
   integrationLogs,
   shipmentEvents,
   shipments,
+  users,
 } from "@/db/schema";
 import { iso } from "@/lib/format";
 import type {
@@ -175,6 +178,9 @@ export async function listCarriers(): Promise<CarrierRow[]> {
     ...row,
     createdAt: iso(row.createdAt) as string,
     lastSyncAt: iso(row.lastSyncAt),
+    trackingUrl: row.trackingUrl,
+    apiKey: row.apiKey,
+    apiSecret: row.apiSecret,
     totalShipments: totalMap.get(row.id) ?? 0,
     activeShipments: activeMap.get(row.id) ?? 0,
   }));
@@ -333,4 +339,61 @@ export async function countShipmentsWithPendingDocs(): Promise<number> {
 export async function shipmentsCreatedSince(date: Date): Promise<number> {
   const rows = await db.select({ id: shipments.id }).from(shipments).where(gte(shipments.createdAt, date));
   return rows.length;
+}
+
+export type Alert = { id: string; title: string; body: string; tone: "rose" | "amber" | "sky"; href: string };
+
+export async function getAlerts(): Promise<Alert[]> {
+  const [allShipments, invoiceRows, docRows] = await Promise.all([listShipments(), listInvoices(), listDocuments()]);
+  const alerts: Alert[] = [];
+  const now = Date.now();
+
+  for (const shipment of allShipments) {
+    if (shipment.pendingDocs > 0) {
+      alerts.push({
+        id: `docs-${shipment.id}`,
+        title: `${shipment.pendingDocs} مستند بانتظار المراجعة`,
+        body: `${shipment.reference} — ${shipment.clientName ?? "بدون عميل"}`,
+        tone: "amber",
+        href: `/shipments/${shipment.id}`,
+      });
+    }
+    if (shipment.status === "on_hold") {
+      alerts.push({ id: `hold-${shipment.id}`, title: "ملف معلّق يحتاج إجراءً", body: shipment.reference, tone: "rose", href: `/shipments/${shipment.id}` });
+    }
+    if (shipment.eta && new Date(shipment.eta).getTime() < now && !["released", "delivered"].includes(shipment.status)) {
+      alerts.push({ id: `late-${shipment.id}`, title: "تجاوز موعد الوصول المتوقع", body: `${shipment.reference} — ${shipment.port ?? ""}`, tone: "rose", href: `/customs?id=${shipment.id}` });
+    }
+  }
+  for (const invoice of invoiceRows) {
+    const remaining = invoice.total - invoice.paidAmount;
+    if (invoice.status === "overdue" || (remaining > 0 && invoice.dueDate && new Date(invoice.dueDate).getTime() < now)) {
+      alerts.push({ id: `inv-${invoice.id}`, title: "فاتورة متأخرة تحتاج تحصيلاً", body: `${invoice.number} — ${invoice.clientName ?? ""} (${remaining.toLocaleString("en-US")} ج.م)`, tone: "rose", href: "/invoices" });
+    }
+  }
+  for (const doc of docRows.filter((row) => row.status === "pending").slice(0, 5)) {
+    alerts.push({ id: `doc-${doc.id}`, title: "مستند جديد بانتظار الاعتماد", body: doc.name, tone: "sky", href: `/shipments/${doc.shipmentId}` });
+  }
+  return alerts.slice(0, 30);
+}
+
+export async function getAppSettings(): Promise<Record<string, string>> {
+  const rows = await db.select().from(appSettings);
+  return Object.fromEntries(rows.map((row) => [row.key, row.value]));
+}
+
+export async function setAppSettings(values: Record<string, string>, actor: string) {
+  for (const [key, value] of Object.entries(values)) {
+    await db.insert(appSettings).values({ key, value, updatedAt: new Date() }).onConflictDoUpdate({ target: appSettings.key, set: { value, updatedAt: new Date() } });
+  }
+  await db.insert(auditLogs).values({ actorName: actor, action: "تحديث بيانات المنشأة", entity: "app_settings", details: Object.keys(values).join(", ") });
+}
+
+export async function listUsers() {
+  const rows = await db.select().from(users).orderBy(asc(users.id));
+  return rows.map((row) => ({
+    id: row.id, name: row.name, email: row.email, role: row.role, jobTitle: row.jobTitle,
+    phone: row.phone, avatarColor: row.avatarColor, permissions: row.permissions ?? [], active: row.active,
+    createdAt: iso(row.createdAt) as string,
+  }));
 }

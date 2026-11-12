@@ -49,6 +49,9 @@ const EMPTY_FORM = {
   integrationStatus: "pending",
   color: "#0b2545",
   notes: "",
+  trackingUrl: "",
+  apiKey: "",
+  apiSecret: "",
 };
 
 export function CarriersClient({ initialCarriers }: { initialCarriers: CarrierRow[] }) {
@@ -109,6 +112,9 @@ export function CarriersClient({ initialCarriers }: { initialCarriers: CarrierRo
       integrationStatus: carrier.integrationStatus,
       color: carrier.color,
       notes: carrier.notes ?? "",
+      trackingUrl: carrier.trackingUrl ?? "",
+      apiKey: carrier.apiKey ?? "",
+      apiSecret: carrier.apiSecret ?? "",
     });
     setError(null);
     setOpen(true);
@@ -192,6 +198,9 @@ export function CarriersClient({ initialCarriers }: { initialCarriers: CarrierRo
       country: form.country || null,
       scac: form.scac || null,
       apiEndpoint: form.apiEndpoint || null,
+      trackingUrl: form.trackingUrl || null,
+      apiKey: form.apiKey || null,
+      apiSecret: form.apiSecret || null,
       integrationStatus: form.integrationStatus,
       lastSyncAt: form.integrationStatus === "connected" ? new Date().toISOString() : null,
       shipmentsSynced: 0,
@@ -432,6 +441,15 @@ export function CarriersClient({ initialCarriers }: { initialCarriers: CarrierRo
           </Field>
           <Field label="لون الهوية">
             <input type="color" className="input h-10 p-1" value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} />
+          </Field>
+          <Field label="رابط بوابة التتبع" hint="مثال: https://portal.cargolinx.com أو بوابة الشركة" className="sm:col-span-2">
+            <input className="input" dir="ltr" value={form.trackingUrl} onChange={(e) => setForm({ ...form, trackingUrl: e.target.value })} placeholder="https://portal.cargolinx.com/track" />
+          </Field>
+          <Field label="API Key / Client ID" hint="من حسابك لدى الشركة — يُخزَّن في قاعدة بياناتك">
+            <input className="input" dir="ltr" value={form.apiKey} onChange={(e) => setForm({ ...form, apiKey: e.target.value })} />
+          </Field>
+          <Field label="API Secret">
+            <input className="input" dir="ltr" type="password" value={form.apiSecret} onChange={(e) => setForm({ ...form, apiSecret: e.target.value })} />
           </Field>
           <Field label="ملاحظات الربط" className="sm:col-span-2">
             <textarea className="input min-h-20 resize-y" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />

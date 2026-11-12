@@ -15,11 +15,18 @@ export async function POST(request: Request) {
   const payload = body as Record<string, unknown>;
   const name = asString(payload.name);
   if (name.length < 3) return jsonError("الاسم يجب أن يكون 3 أحرف على الأقل.");
+  const email = asString(payload.email).toLowerCase();
+  if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return jsonError("صيغة البريد الإلكتروني غير صحيحة.");
+  if (email && email !== user.email) {
+    const duplicate = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
+    if (duplicate.length) return jsonError("هذا البريد مستخدم لحساب آخر.", 409);
+  }
 
   const [updated] = await db
     .update(users)
     .set({
       name,
+      ...(email ? { email } : {}),
       jobTitle: asOptionalString(payload.jobTitle),
       phone: asOptionalString(payload.phone),
       avatarColor: asString(payload.avatarColor, user.avatarColor) || user.avatarColor,
