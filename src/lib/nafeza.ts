@@ -28,15 +28,15 @@ type ShipmentForAci = {
 };
 
 /**
- * Real Nafeza (Egyptian Single Window) declaration submission.
- * Requires NAFEZA_API_URL + NAFEZA_CLIENT_ID + NAFEZA_CLIENT_SECRET (+ optional NAFEZA_TOKEN_URL).
- * Falls back to a clearly-labelled local simulation when credentials are absent.
+ * Nafeza submission is available ONLY for a licensed API integration with
+ * its exact documented token and declaration endpoints. No guessed endpoints,
+ * scraped login pages, simulated ACIDs, or fabricated success responses.
  */
 export async function sendNafezaDeclaration(identifier: string, actor: string): Promise<NafezaResult> {
-  const apiUrl = process.env.NAFEZA_API_URL;
+  const tokenUrl = process.env.NAFEZA_TOKEN_URL;
+  const submitUrl = process.env.NAFEZA_DECLARATIONS_URL;
   const clientId = process.env.NAFEZA_CLIENT_ID;
   const clientSecret = process.env.NAFEZA_CLIENT_SECRET;
-  const tokenUrl = process.env.NAFEZA_TOKEN_URL ?? (apiUrl ? `${apiUrl.replace(/\/$/, "")}/oauth2/token` : null);
 
   const rows = await db
     .select({
@@ -86,13 +86,13 @@ export async function sendNafezaDeclaration(identifier: string, actor: string): 
     },
   };
 
-  if (!apiUrl || !clientId || !clientSecret || !tokenUrl) {
+  if (!submitUrl || !clientId || !clientSecret || !tokenUrl) {
     return {
       ok: false,
       status: "unconfigured",
       reference: null,
       message:
-        "لم يتم إعداد مفاتيح منصة نافذة. أضف NAFEZA_API_URL و NAFEZA_CLIENT_ID و NAFEZA_CLIENT_SECRET (و NAFEZA_TOKEN_URL) في متغيرات البيئة.",
+        "لا يوجد ربط معتمد مع نافذة. يتطلب NAFEZA_TOKEN_URL وNAFEZA_DECLARATIONS_URL الموثقين من نافذة وNAFEZA_CLIENT_ID وNAFEZA_CLIENT_SECRET. رقم ACID يصدر من نافذة فقط.",
       httpStatus: null,
       payload: declaration,
     };
@@ -133,7 +133,6 @@ export async function sendNafezaDeclaration(identifier: string, actor: string): 
       };
     }
 
-    const submitUrl = `${apiUrl.replace(/\/$/, "")}/aci/declarations`;
     const response = await fetch(submitUrl, {
       method: "POST",
       headers: {
@@ -173,7 +172,7 @@ export async function sendNafezaDeclaration(identifier: string, actor: string): 
     await db.insert(shipmentEvents).values({
       shipmentId: shipment.id,
       title: "قبول إقرار ACID من منصة نافذة (حقيقي)",
-      description: `رقم ACID: ${aci ?? "—"} · الجهة: ${new URL(apiUrl).host} · بواسطة ${actor}.`,
+      description: `المرجع: ${aci ?? "لم يُرجع رقم ACID"} · الجهة: ${new URL(submitUrl).host} · بواسطة ${actor}.`,
       type: "customs",
       location: "منصة نافذة",
       occurredAt: new Date(),

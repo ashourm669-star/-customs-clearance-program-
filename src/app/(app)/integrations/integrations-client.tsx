@@ -63,7 +63,8 @@ export function IntegrationsClient({
   const shippingCarriers = carriers.filter((carrier) => carrier.type !== "platform");
   const connected = shippingCarriers.filter((carrier) => carrier.integrationStatus === "connected").length;
   const errors = logs.filter((log) => log.status === "error").length;
-  const successRate = logs.length ? Math.round((logs.filter((log) => log.status === "success").length / logs.length) * 100) : 100;
+  const actualLogs = logs.filter((log) => log.status !== "demo");
+  const successRate = actualLogs.length ? Math.round((actualLogs.filter((log) => log.status === "success").length / actualLogs.length) * 100) : null;
 
   const filteredLogs = useMemo(
     () =>
@@ -155,7 +156,7 @@ export function IntegrationsClient({
     <div>
       <PageHeader
         title="الربط والتكامل — نافذة وشركات الشحن"
-        description="مزامنة البوالص والإقرارات الجمركية ومتابعة الشحنات لحظياً من واجهات شركات الطيران والخطوط الملاحية."
+         description="المزامنة الحقيقية لا تتم إلا بمفاتيح API معتمدة؛ السجلات التجريبية معلَّمة كعرض ولا تدخل في معدل النجاح."
       >
         <button type="button" onClick={runAll} disabled={busyAll} className="btn btn-primary">
           {busyAll ? <Spinner /> : <RefreshCw className="size-4" />}
@@ -181,7 +182,7 @@ export function IntegrationsClient({
           </span>
           <div>
             <p className="text-[10px] text-slate-500">حالة منصة نافذة</p>
-            <p className="text-sm font-extrabold text-slate-900">{nafeza?.integrationStatus === "connected" ? "متصل · API v2" : "غير متصل"}</p>
+            <p className="text-sm font-extrabold text-slate-900">{nafeza?.integrationStatus === "connected" ? "مُعدّ؛ اختبر الرد الفعلي" : "لا يوجد اعتماد رسمي"}</p>
           </div>
         </div>
         <div className="card flex items-center gap-3 p-4">
@@ -190,7 +191,7 @@ export function IntegrationsClient({
           </span>
           <div>
             <p className="text-[10px] text-slate-500">معدل نجاح العمليات</p>
-            <p className="text-lg font-extrabold text-slate-900">{successRate}%</p>
+            <p className="text-lg font-extrabold text-slate-900">{successRate === null ? "—" : `${successRate}%`}</p>
           </div>
         </div>
         <div className="card flex items-center gap-3 p-4">
@@ -364,13 +365,13 @@ export function IntegrationsClient({
                         <span className="flex items-center gap-1 text-[11px] font-bold">
                           {log.status === "success" ? (
                             <CheckCircle2 className="size-3.5 text-emerald-500" />
-                          ) : log.status === "warning" ? (
+                          ) : log.status === "warning" || log.status === "demo" ? (
                             <AlertTriangle className="size-3.5 text-amber-500" />
                           ) : (
                             <XCircle className="size-3.5 text-rose-500" />
                           )}
-                          <span className={log.status === "success" ? "text-emerald-600" : log.status === "warning" ? "text-amber-600" : "text-rose-600"}>
-                            {log.status === "success" ? "ناجحة" : log.status === "warning" ? "تحذير" : "فشل"}
+                          <span className={log.status === "success" ? "text-emerald-600" : log.status === "warning" || log.status === "demo" ? "text-amber-600" : "text-rose-600"}>
+                            {log.status === "success" ? "ناجحة" : log.status === "warning" ? "تحذير" : log.status === "demo" ? "عرض تجريبي" : "فشل"}
                           </span>
                         </span>
                       </td>

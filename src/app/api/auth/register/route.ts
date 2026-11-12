@@ -16,6 +16,11 @@ function redirectTo(_request: Request, path: string) {
 }
 
 export async function POST(request: Request) {
+  // Public self-registration would grant strangers access to company shipment data.
+  // Staff accounts must be created by an authenticated admin at /users.
+  if (process.env.ALLOW_PUBLIC_REGISTRATION !== "true") {
+    return jsonError("إنشاء الموظفين متاح لمدير النظام من صفحة المستخدمين فقط.", 403);
+  }
   if (!process.env.DATABASE_URL) {
     return redirectTo(request, `/login?mode=register&error=${encodeURIComponent("لم يتم ربط قاعدة البيانات بعد. أضف DATABASE_URL في Vercel ثم أعد النشر.")}`);
   }

@@ -12,6 +12,7 @@ import {
   Search,
   ShieldAlert,
   Camera,
+  ExternalLink,
   Trash2,
   Upload,
   X,
@@ -42,6 +43,8 @@ export function DocumentsClient({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DocumentItem | null>(null);
+  const [cameraShipmentId, setCameraShipmentId] = useState("");
+  const [pickedFile, setPickedFile] = useState<File | null>(null);
 
   const filtered = useMemo(() => {
     const search = query.trim().toLowerCase();
@@ -66,8 +69,8 @@ export function DocumentsClient({
   );
 
   async function captureDocument(file: File) {
-    const activeShipment = shipments[0];
-    if (!activeShipment) { toast({ title: "لا يوجد ملف تخليص لإضافة الصورة إليه", tone: "error" }); return; }
+    const activeShipment = shipments.find((shipment) => String(shipment.id) === cameraShipmentId);
+    if (!activeShipment) { toast({ title: "اختر ملف التخليص قبل التصوير", tone: "error" }); return; }
     setSaving(true);
     try {
       const formData = new FormData();
@@ -78,7 +81,7 @@ export function DocumentsClient({
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "تعذّر رفع الصورة");
       setDocuments((current) => [data.document, ...current]);
-      toast({ title: "تم رفع الصورة وتصنيفها كمستند", description: `${activeShipment.reference} — بانتظار المراجعة`, tone: "success" });
+      toast({ title: "حُفظ ملف الصورة فعلياً", description: `${activeShipment.reference} — اضغط «عرض» لفتحه`, tone: "success" });
       router.refresh();
     } catch (caught) { toast({ title: "تعذّر رفع الصورة", description: caught instanceof Error ? caught.message : undefined, tone: "error" }); }
     finally { setSaving(false); }
@@ -96,6 +99,26 @@ export function DocumentsClient({
     }
     setSaving(true);
     setError(null);
+    if (pickedFile) {
+      try {
+        const formData = new FormData();
+        formData.append("shipmentId", form.shipmentId);
+        formData.append("name", form.name);
+        formData.append("file", pickedFile);
+        const response = await fetch("/api/documents/upload", { method: "POST", body: formData });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error ?? "تعذّر حفظ الملف");
+        setDocuments((current) => [data.document, ...current]);
+        setOpen(false);
+        setPickedFile(null);
+        setForm({ shipmentId: "", name: "", type: "commercial_invoice", sizeKb: "280" });
+        toast({ title: "تم حفظ الملف ويمكن فتحه من القائمة", tone: "success" });
+        router.refresh();
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : "تعذّر رفع الملف");
+      } finally { setSaving(false); }
+      return;
+    }
     const shipment = shipments.find((item) => item.id === Number(form.shipmentId));
     const tempId = -Date.now();
     const optimistic: DocumentItem = {
@@ -169,21 +192,27 @@ export function DocumentsClient({
 
   return (
     <div>
-      <PageHeader title="مركز المستندات" description="كل مستندات التخليص في مكان واحد: فواتير، بوالص، شهادات منشأ وتصاريح.">
-        <label className="btn btn-ghost cursor-pointer">
-          <Camera className="size-4" />
-          تصوير مستند
-          <input type="file" accept="image/*" capture="environment" className="hidden" onChange={async (event) => {
-            const file = event.target.files?.[0];
-            if (!file) return;
-            await captureDocument(file);
-          }} />
-        </label>
+      <PageHeader title="مركز المستندات" description="المرفقات المصوّرة تُحفظ في قاعدة البيانات ويمكن عرضها لاحقاً؛ سجلات الديمو القديمة أسماء فقط.">
         <button type="button" onClick={() => setOpen(true)} className="btn btn-primary">
           <Plus className="size-4" />
           تسجيل مستند
         </button>
       </PageHeader>
+      <div id="camera-upload" className="card mb-4 flex flex-wrap items-center gap-3 p-4">
+        <div className="min-w-44 flex-1">
+          <p className="text-xs font-bold text-slate-800">تصوير وإرفاق مستند حقيقي</p>
+          <p className="text-[10px] text-slate-500">اختر الملف ثم افتح الكاميرا · JPG/PNG/WebP/PDF حتى 4 ميجابايت</p>
+        </div>
+        <select className="input max-w-72" value={cameraShipmentId} onChange={(event) => setCameraShipmentId(event.target.value)} aria-label="ملف التخليص للمرفق">
+          <option value="">— اختر ملف التخليص أولاً —</option>
+          {shipments.map((shipment) => <option key={shipment.id} value={shipment.id}>{shipment.reference} — {shipment.clientName ?? ""}</option>)}
+        </select>
+        <label className={`btn btn-ghost cursor-pointer ${!cameraShipmentId || saving ? "opacity-50" : ""}`}>
+          <Camera className="size-4" /> فتح الكاميرا
+          <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" capture="environment" className="hidden" disabled={!cameraShipmentId || saving}
+            onChange={(event) => { const file = event.target.files?.[0]; if (file) void captureDocument(file); event.target.value = ""; }} />
+        </label>
+      </div>
 
       <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="إجمالي المستندات" value={formatNumber(counts.total)} icon={<FileStack className="size-5" />} accent="#0ea5e9" hint="كل الملفات" />
@@ -283,10 +312,11 @@ export function DocumentsClient({
                         <Badge tone={meta.tone}>{meta.label}</Badge>
                       </td>
                       <td className="td">
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            type="button"
-                            onClick={() => changeStatus(doc, "approved")}
+                         <div className="flex items-center justify-end gap-1">
+                           {doc.fileUrl && <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer" className="rounded-lg p-1.5 text-teal-600 hover:bg-teal-50" title="عرض المرفق المحفوظ" aria-label="عرض الملف"><ExternalLink className="size-4" /></a>}
+                           <button
+                             type="button"
+                             onClick={() => changeStatus(doc, "approved")}
                             className="rounded-lg p-1.5 text-slate-400 transition hover:bg-emerald-50 hover:text-emerald-600"
                             aria-label="اعتماد"
                           >
@@ -347,12 +377,13 @@ export function DocumentsClient({
               ))}
             </select>
           </Field>
-          <Field label="اختيار ملف من الجهاز" hint="سيتم تسجيل اسم الملف وحجمه بالسجل">
+          <Field label="اختيار ملف من الجهاز" hint="يُحفظ الملف كاملاً عند اختيار JPG/PNG/WebP/PDF؛ بدون ملف يُحفظ سجل بيانات فقط">
             <input
               type="file"
               className="input py-2 text-xs"
               onChange={(event) => {
                 const file = event.target.files?.[0];
+                setPickedFile(file ?? null);
                 if (file) setForm({ ...form, name: file.name, sizeKb: String(Math.max(1, Math.round(file.size / 1024))) });
               }}
             />

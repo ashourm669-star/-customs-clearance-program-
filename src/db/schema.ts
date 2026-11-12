@@ -244,6 +244,13 @@ export const documents = pgTable("documents", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+export const documentBlobs = pgTable("document_blobs", {
+  documentId: integer("document_id").primaryKey().references(() => documents.id, { onDelete: "cascade" }),
+  mimeType: text("mime_type").notNull(),
+  dataBase64: text("data_base64").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 export const invoices = pgTable("invoices", {
   id: serial("id").primaryKey(),
   number: text("number").notNull().unique(),

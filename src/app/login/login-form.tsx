@@ -11,9 +11,9 @@ type Mode = "login" | "register";
 export function LoginForm({ initialMode = "login" }: { initialMode?: Mode }) {
   const router = useRouter();
   const toast = useToast();
-  const [mode, setMode] = useState<Mode>(initialMode);
-  const [email, setEmail] = useState("admin@alarabi.com");
-  const [password, setPassword] = useState("123456");
+  const [mode, setMode] = useState<Mode>("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [jobTitle, setJobTitle] = useState("مخلص جمركي");
   const [showPassword, setShowPassword] = useState(false);
@@ -51,22 +51,8 @@ export function LoginForm({ initialMode = "login" }: { initialMode?: Mode }) {
 
   return (
     <div>
-      <div className="mb-5 grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1">
-        {(["login", "register"] as Mode[]).map((option) => (
-          <button
-            key={option}
-            type="button"
-            onClick={() => {
-              setMode(option);
-              setError(null);
-            }}
-            className={`rounded-lg py-2 text-xs font-bold transition ${
-              mode === option ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
-            }`}
-          >
-            {option === "login" ? "تسجيل الدخول" : "حساب جديد"}
-          </button>
-        ))}
+      <div className="mb-5 rounded-xl bg-slate-100 px-4 py-2 text-xs font-bold text-slate-700">
+        تسجيل الدخول · حسابات الموظفين ينشئها مدير النظام فقط
       </div>
 
       <form
@@ -164,13 +150,9 @@ export function LoginForm({ initialMode = "login" }: { initialMode?: Mode }) {
         </button>
       </form>
 
-      <div className="mt-4 rounded-xl bg-slate-50 p-3 text-[11px] leading-6 text-slate-500 ring-1 ring-inset ring-slate-200">
-        <span className="font-bold text-slate-700">بيانات الدخول التجريبية:</span>
-        <br />
-        admin@alarabi.com · كلمة المرور 123456
-        <br />
-        <span className="text-slate-400">أو اضغط «دخول مباشر» بالأعلى للدخول دون كتابة أي بيانات.</span>
-      </div>
+      <p className="mt-4 text-center text-[11px] leading-6 text-slate-500">
+        سجّل الدخول بالبريد المرتبط بحسابك وكلمة المرور التي حددتها. لإضافة موظفين افتح «المستخدمون والصلاحيات» بعد الدخول كمدير.
+      </p>
     </div>
   );
 }

@@ -105,6 +105,7 @@ export type DocumentItem = {
   status: string;
   sizeKb: number;
   uploadedBy: string | null;
+  fileUrl?: string | null;
   createdAt: string;
 };
 

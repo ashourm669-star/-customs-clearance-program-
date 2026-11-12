@@ -9,12 +9,15 @@ import {
   shipments,
   tariffCodes,
   users,
+  appSettings,
+  banks,
 } from "@/db/schema";
 import { hashPassword } from "@/lib/password";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { ensureSchema } from "@/lib/db-bootstrap";
 import { seedCustomsReference } from "@/lib/seed-customs";
 import type { DocType, Direction, InvoiceStatus, Mode, Priority, ShipmentStatus } from "@/lib/constants";
+import { BANK_DIRECTORY } from "@/lib/bank-directory";
 
 const DAY = 86_400_000;
 const ago = (days: number, hours = 9) => new Date(Date.now() - days * DAY + hours * 3_600_000);
@@ -853,6 +856,60 @@ export async function ensureSeeded() {
         const tariffCount = await db.select({ id: tariffCodes.id }).from(tariffCodes).limit(1);
         if (tariffCount.length === 0) {
           await seedCustomsReference();
+        }
+
+        // One-time requested business identity correction; future edits in Settings are preserved.
+        const marker = await db.select({ key: appSettings.key }).from(appSettings)
+          .where(eq(appSettings.key, "business_identity_2026_11_v1")).limit(1);
+        if (!marker.length) {
+          for (const [key, value] of Object.entries({ commercial_register: "364", tax_id: "439942616" })) {
+            await db.insert(appSettings).values({ key, value }).onConflictDoUpdate({
+              target: appSettings.key, set: { value, updatedAt: new Date() },
+            });
+          }
+          await db.insert(appSettings).values({ key: "business_identity_2026_11_v1", value: "applied" })
+            .onConflictDoNothing();
+        }
+        // Change only the original demo admin email; never alter the user's password hash.
+        const desiredEmail = "ashourm669@gmail.com";
+        const targetExists = await db.select({ id: users.id }).from(users).where(eq(users.email, desiredEmail)).limit(1);
+        if (!targetExists.length) {
+          await db.update(users).set({ email: desiredEmail })
+            .where(eq(users.email, "admin@alarabi.com"));
+        }
+
+        // Previous demo carrier statuses and activity logs were misleading.
+        const integrationMarker = await db.select({ key: appSettings.key }).from(appSettings)
+          .where(eq(appSettings.key, "integration_truth_2026_11_v1")).limit(1);
+        if (!integrationMarker.length) {
+          await db.execute(sql`
+            update carriers set integration_status = 'disconnected'
+            where integration_status = 'connected' and api_key is null and api_secret is null
+          `);
+          await db.execute(sql`
+            update integration_logs
+               set status = 'demo', message = 'بيانات عرض فقط — ' || message
+             where reference in (
+               'SYNC-MAEU-88214','SYNC-MSAW-19120','ACID-2026-EG-4471',
+               'TRK-EK-3329901','SYNC-EGLV-ERR','SYNC-LHAC-PEND',
+               'SYNC-MSCU-33218','ACID-2026-EG-4472','SYNC-CMDU-7733910',
+               'TRK-QR-2201845','SYNC-HLCU-9901128','ACID-2026-EG-4402'
+             ) and status <> 'demo'
+          `);
+          await db.insert(appSettings).values({ key: "integration_truth_2026_11_v1", value: "applied" })
+            .onConflictDoNothing();
+        }
+
+        // Directory entries are reference data, not banking API connections.
+        const presentBanks = await db.select({ code: banks.code }).from(banks);
+        const codes = new Set(presentBanks.map((bank) => bank.code));
+        for (const bank of BANK_DIRECTORY) {
+          if (codes.has(bank.code)) continue;
+          await db.insert(banks).values({
+            ...bank, status: "manual", currency: "EGP",
+            notes: "دليل مرجعي — رمز القائمة داخلي، ولا يوجد ربط بنكي مباشر أو حساب مُعتمد.",
+          });
+          codes.add(bank.code);
         }
       } catch (error) {
         console.error("[seed] skipped:", error);

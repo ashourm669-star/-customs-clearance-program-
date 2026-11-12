@@ -6,6 +6,7 @@ import {
   carriers,
   clients,
   documents,
+  documentBlobs,
   invoices,
   integrationLogs,
   shipmentEvents,
@@ -231,13 +232,19 @@ export async function listDocuments(): Promise<DocumentItem[]> {
       sizeKb: documents.sizeKb,
       uploadedBy: documents.uploadedBy,
       createdAt: documents.createdAt,
+      storedFileId: documentBlobs.documentId,
     })
     .from(documents)
     .innerJoin(shipments, eq(documents.shipmentId, shipments.id))
     .leftJoin(clients, eq(shipments.clientId, clients.id))
+    .leftJoin(documentBlobs, eq(documents.id, documentBlobs.documentId))
     .orderBy(desc(documents.createdAt));
 
-  return rows.map((row) => ({ ...row, createdAt: iso(row.createdAt) as string }));
+  return rows.map((row) => ({
+    ...row,
+    fileUrl: row.storedFileId ? `/api/documents/${row.id}/file` : null,
+    createdAt: iso(row.createdAt) as string,
+  }));
 }
 
 export async function listEventsForShipment(shipmentId: number): Promise<EventItem[]> {

@@ -11,6 +11,7 @@ import {
   Database,
   DownloadCloud,
   FileQuestion,
+  ExternalLink,
   Globe2,
   KeyRound,
   MapPin,
@@ -24,6 +25,7 @@ import { Badge, EmptyState, Spinner, cx } from "@/components/ui";
 import { useToast } from "@/components/toast";
 import { MODE_META, SHIPMENT_STATUS_META, type ShipmentStatus } from "@/lib/constants";
 import { formatDate, formatDateTime, relativeTime } from "@/lib/format";
+import { TRACKING_PORTALS, suggestedPortal } from "@/lib/carrier-directory";
 
 type TrackingMatch = {
   id: number;
@@ -145,7 +147,7 @@ export function TrackingClient({
     }
   }
 
-  const connectedCarriers = carriers.filter((carrier) => carrier.status === "connected").length;
+  const detectedPortal = suggestedPortal(query);
 
   return (
     <div className="space-y-5">
@@ -153,12 +155,12 @@ export function TrackingClient({
         <div className="pointer-events-none absolute -left-14 -top-16 size-56 rounded-full bg-[#0f9d8b]/25 blur-2xl" />
         <div className="relative">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold text-emerald-200 ring-1 ring-inset ring-white/15">
-            <Radar className="size-3.5" /> استعلام مباشر من واجهات الشركات
+            <Radar className="size-3.5" /> ملفاتك + بوابات التتبع الرسمية
           </span>
-          <h1 className="mt-2 text-xl font-extrabold sm:text-2xl">أدخل رقم البوليصة واجلب بياناتها الحقيقية</h1>
+          <h1 className="mt-2 text-xl font-extrabold sm:text-2xl">استعلم برقم البوليصة / AWB</h1>
           <p className="mt-1 max-w-2xl text-[12px] leading-6 text-slate-200/90">
-            الاستعلام يمر بمرحلتين: ملفاتك في قاعدة البيانات، ثم واجهة التتبع الخارجية (DCSA أو مزوّد مصرّح). عند وصول
-            البيانات الحقيقية يمكنك استيرادها بضغطة لتظهر داخل ملف التخليص وسجل التتبع.
+            يبحث في ملفات الشركة. الربط داخل النظام ببيانات الناقل الحقيقية يعمل فقط عند إضافة مفاتيح API مصرح بها.
+            بدونها تظهر روابط بوابات التتبع الفعلية أدناه لتفتحها بنفسك؛ لن نعرض بيانات شحنة مختلقة.
           </p>
 
           <form
@@ -209,10 +211,10 @@ export function TrackingClient({
           <div>
             <p className="text-[10px] text-slate-500">مزوّد التتبع الخارجي</p>
             <p className="text-sm font-extrabold text-slate-900">
-              {providerConfigured ? "مربوط — استعلام حقيقي" : "غير مربوط"}
+              {providerConfigured ? "API مُعدّ — تحقق من الرد عند البحث" : "لا توجد مفاتيح API"}
             </p>
             <p className="text-[9px] text-slate-400">
-              {providerConfigured ? "DCSA / مزوّد مصرّح" : "يحتاج DCSA_* أو TRACKING_*"}
+              {providerConfigured ? "فقط نتيجة بحث ناجحة تثبت الاتصال" : "يمكن فتح مواقع الناقلين أدناه"}
             </p>
           </div>
         </div>
@@ -232,11 +234,33 @@ export function TrackingClient({
           <div>
             <p className="text-[10px] text-slate-500">شركات مسجّلة</p>
             <p className="text-sm font-extrabold text-slate-900">
-              {connectedCarriers} متصلة من {carriers.length}
+              {carriers.length} ناقلاً مسجلاً (ليس بالضرورة متصلاً)
             </p>
           </div>
         </div>
       </div>
+
+      <section className="card overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-5 py-3">
+          <div>
+            <h2 className="text-sm font-extrabold text-slate-900">بوابات التتبع الأصلية للشركات</h2>
+            <p className="text-[10px] text-slate-500">روابط تفتح موقع الناقل الحقيقي؛ لا تعني وجود اتصال API داخل البرنامج.</p>
+          </div>
+          {detectedPortal && <span className="rounded-full bg-teal-50 px-2 py-1 text-[10px] font-bold text-teal-800">البادئة تطابق: {detectedPortal.name}</span>}
+        </div>
+        <div className="grid max-h-72 gap-2 overflow-y-auto p-3 sm:grid-cols-2 xl:grid-cols-3">
+          {TRACKING_PORTALS.map((portal) => (
+            <a key={portal.code} href={portal.url} target="_blank" rel="noopener noreferrer"
+              className={`flex items-start gap-2 rounded-xl border p-3 transition-colors hover:border-teal-300 hover:bg-teal-50/40 ${detectedPortal?.code === portal.code ? "border-teal-300 bg-teal-50" : "border-slate-100"}`}>
+              <ExternalLink className="mt-0.5 size-4 shrink-0 text-teal-600" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-[11px] font-bold text-slate-800">{portal.name}</span>
+                <span className="block text-[10px] text-slate-500">{portal.prefix ? `بادئة AWB: ${portal.prefix} · ` : ""}{portal.note ?? "يفتح صفحة الناقل للتتبع"}</span>
+              </span>
+            </a>
+          ))}
+        </div>
+      </section>
 
       {error ? (
         <div className="flex items-start gap-2 rounded-xl bg-rose-50 p-3 text-xs font-semibold text-rose-700 ring-1 ring-inset ring-rose-200">

@@ -24,6 +24,7 @@ import {
   ShieldCheck,
   Users,
   BellRing,
+  Camera,
   X,
 } from "lucide-react";
 import { navSections } from "@/lib/constants";
@@ -64,13 +65,39 @@ const pageTitles: Record<string, string> = {
   "/alerts": "الإشعارات والتنبيهات",
 };
 
-export function AppShell({ user, alertsCount = 0, children }: { user: SessionUser; alertsCount?: number; children: ReactNode }) {
+export function AppShell({ user, alertsCount = 0, nafezaConfigured = false, trackingConfigured = false, children }: {
+  user: SessionUser;
+  alertsCount?: number;
+  nafezaConfigured?: boolean;
+  trackingConfigured?: boolean;
+  children: ReactNode;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [liveAlertsCount, setLiveAlertsCount] = useState(alertsCount);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setLiveAlertsCount(alertsCount);
+  }, [alertsCount]);
+
+  useEffect(() => {
+    let active = true;
+    const refreshAlerts = async () => {
+      try {
+        const res = await fetch("/api/alerts", { cache: "no-store" });
+        if (res.ok && active) setLiveAlertsCount(Number((await res.json()).count ?? 0));
+      } catch { /* the bell keeps the last known count while offline */ }
+    };
+    void refreshAlerts();
+    const timer = window.setInterval(refreshAlerts, 45_000);
+    const onVisible = () => { if (!document.hidden) void refreshAlerts(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { active = false; window.clearInterval(timer); document.removeEventListener("visibilitychange", onVisible); };
+  }, [pathname]);
 
   useEffect(() => {
     function onClick(event: MouseEvent) {
@@ -152,21 +179,18 @@ export function AppShell({ user, alertsCount = 0, children }: { user: SessionUse
         ))}
       </nav>
 
-      <div className="mx-3 mb-3 rounded-xl border border-white/10 bg-white/[0.06] p-3">
+      <Link href="/integrations" className="mx-3 mb-3 rounded-xl border border-white/10 bg-white/[0.06] p-3">
         <div className="flex items-center gap-2">
-          <span className="relative flex size-2">
-            <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-70" />
-            <span className="relative inline-flex size-2 rounded-full bg-emerald-400" />
-          </span>
-          <p className="text-[11px] font-bold text-white">نافذة · متصل</p>
-          <span className="mr-auto rounded-md bg-emerald-400/15 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300">
-            API v2
+          <span className={`size-2 rounded-full ${nafezaConfigured && trackingConfigured ? "bg-amber-400" : "bg-rose-400"}`} />
+          <p className="text-[11px] font-bold text-white">حالة الربط الخارجي</p>
+          <span className="mr-auto rounded-md bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-bold text-amber-200">
+            {nafezaConfigured && trackingConfigured ? "مفاتيح مُعدّة" : "غير مكتمل"}
           </span>
         </div>
         <p className="mt-1.5 text-[10px] leading-5 text-slate-300/80">
-          الربط مع الشباك الواحد و11 شركة شحن يعمل بكفاءة.
+          نافذة: {nafezaConfigured ? "مُعدّة، تحقق من استجابة API" : "لا يوجد اعتماد API"} · الناقلون: {trackingConfigured ? "مُعدّ، يحتاج اختبار" : "مواقع التتبع فقط"}
         </p>
-      </div>
+      </Link>
 
       <div className="px-3 pb-2">
         <InstallAppCard compact />
@@ -229,6 +253,9 @@ export function AppShell({ user, alertsCount = 0, children }: { user: SessionUse
             </form>
 
             <ExportMenu />
+            <Link href="/documents?camera=1" className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50" title="تصوير مرفق وحفظه" aria-label="فتح الكاميرا لإضافة مرفق">
+              <Camera className="size-5" />
+            </Link>
 
             <Link href="/shipments?new=1" className="btn btn-mint hidden h-10 px-3 text-xs sm:inline-flex">
               <Plus className="size-4" />
@@ -241,9 +268,9 @@ export function AppShell({ user, alertsCount = 0, children }: { user: SessionUse
               aria-label="الإشعارات"
             >
               <Bell className="size-5" />
-              {alertsCount > 0 ? (
+              {liveAlertsCount > 0 ? (
                 <span className="absolute -left-0.5 -top-0.5 flex min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white">
-                  {alertsCount > 9 ? "9+" : alertsCount}
+                  {liveAlertsCount > 9 ? "9+" : liveAlertsCount}
                 </span>
               ) : null}
             </Link>

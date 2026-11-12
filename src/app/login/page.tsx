@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { AlertCircle, CheckCircle2, FileCheck2, Globe2, Plane, ShieldCheck, Ship, Zap } from "lucide-react";
+import { AlertCircle, CheckCircle2, FileCheck2, Globe2, Plane, ShieldCheck, Ship } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { LoginForm } from "./login-form";
 
@@ -66,9 +66,9 @@ export default async function LoginPage({
 
         <div className="relative grid grid-cols-3 gap-3">
           {[
-            { value: "16", label: "ملف تخليص نشط" },
-            { value: "11", label: "شركة شحن مربوطة" },
-            { value: "98%", label: "دقة الإقرارات" },
+            { value: "ملفات", label: "إدارة التخليص" },
+            { value: "بوالص", label: "بحث وتتبّع" },
+            { value: "ACID", label: "توثيق ومتابعة" },
           ].map((stat) => (
             <div key={stat.label} className="rounded-xl border border-white/10 bg-white/[0.04] p-3 text-center">
               <p className="text-xl font-extrabold text-white">{stat.value}</p>
@@ -110,31 +110,16 @@ export default async function LoginPage({
             {params.expired ? (
               <div className="mb-4 flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-xs font-semibold leading-6 text-amber-800 ring-1 ring-inset ring-amber-200">
                 <AlertCircle className="mt-0.5 size-4 shrink-0" />
-                <span>
-                  لم يتم العثور على جلسة دخول محفوظة (قد يكون المتصفح يمنع الكوكيز داخل المعاينة). استخدم زر{" "}
-                  <span className="font-extrabold">«دخول مباشر بحساب العرض التجريبي»</span> بالأسفل، أو افتح الرابط في نافذة
-                  جديدة.
-                </span>
+                <span>انتهت جلسة الدخول. سجّل الدخول ببريدك وكلمة مرورك، وجرّب فتح الصفحة في نافذة جديدة إذا كان المتصفح يمنع الكوكيز.</span>
               </div>
             ) : null}
 
-            <a href="/api/auth/demo" className="btn btn-mint mb-4 w-full">
-              <Zap className="size-4" />
-              دخول مباشر بحساب العرض التجريبي
-            </a>
-
-            <div className="mb-5 flex items-center gap-3 text-[11px] text-slate-400">
-              <span className="h-px flex-1 bg-slate-200" />
-              أو سجّل الدخول ببياناتك
-              <span className="h-px flex-1 bg-slate-200" />
-            </div>
-
-            <LoginForm initialMode={params.mode === "register" ? "register" : "login"} />
+            <LoginForm initialMode="login" />
           </div>
 
           <div className="mt-5 flex items-center justify-center gap-2 text-[11px] text-slate-400">
             <FileCheck2 className="size-3.5" />
-            كل البيانات مشفّرة ومحمية وفق معايير مصلحة الجمارك المصرية.
+              بياناتك محفوظة في قاعدة بيانات الشركة. الخدمة ليست تابعة رسمياً لمصلحة الجمارك أو منصة نافذة.
           </div>
         </div>
       </section>

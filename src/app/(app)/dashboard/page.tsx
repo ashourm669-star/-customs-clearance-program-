@@ -102,7 +102,7 @@ export default async function DashboardPage() {
           <div>
             <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-emerald-200 ring-1 ring-inset ring-white/15">
               <span className="size-1.5 rounded-full bg-emerald-300" />
-              نافذة متصلة · 11 شركة شحن
+              رابط نافذة الرسمي يحتاج اعتماد API · التتبع عبر بوابات الناقلين
             </p>
             <h1 className="mt-3 text-2xl font-extrabold sm:text-[28px]">
               أهلاً {user.name.split(" ")[0]}، يومك مليء بالإفراجات 🚢

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   BadgeCheck,
   Building2,
@@ -14,6 +15,7 @@ import {
   Settings2,
   ShieldCheck,
   UserRound,
+  Users,
 } from "lucide-react";
 import { Avatar, Badge, Field, PageHeader, SectionCard, Spinner } from "@/components/ui";
 import { useToast } from "@/components/toast";
@@ -81,11 +83,12 @@ export function SettingsClient({
       const response = await fetch("/api/settings/profile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...profile, email }),
+        body: JSON.stringify({ ...profile, email: email.replace(/\s+/g, "").toLowerCase() }),
       });
-      const data = (await response.json()) as { error?: string };
+      const data = (await response.json()) as { error?: string; user?: { email: string } };
       if (!response.ok) throw new Error(data.error ?? "");
-      toast({ title: "تم تحديث الملف الشخصي", description: profile.name, tone: "success" });
+      if (data.user?.email) setEmail(data.user.email);
+      toast({ title: "تم تحديث الملف الشخصي", description: `البريد الحالي: ${data.user?.email ?? email}`, tone: "success" });
       router.refresh();
     } catch (error) {
       toast({ title: "تعذّر الحفظ", description: error instanceof Error ? error.message : undefined, tone: "error" });
@@ -120,7 +123,9 @@ export function SettingsClient({
 
   return (
     <div>
-      <PageHeader title="الإعدادات" description="بيانات حسابك، أمان الدخول، ومعلومات منصة العربي للخدمات الجمركية." />
+      <PageHeader title="الإعدادات" description="بيانات حسابك، أمان الدخول، ومعلومات منصة العربي للخدمات الجمركية.">
+        {user.role === "admin" && <Link href="/users" className="btn btn-primary"><Users className="size-4" /> إضافة موظف وتحديد صلاحياته</Link>}
+      </PageHeader>
 
       <div className="grid gap-5 xl:grid-cols-3">
         <div className="space-y-5 xl:col-span-2">
@@ -246,7 +251,7 @@ export function SettingsClient({
                 { icon: <BadgeCheck className="size-3.5" />, label: "رقم المخلص الجمركي", value: "EG-CB-10942" },
                 { icon: <Phone className="size-3.5" />, label: "الهاتف", value: "+20 3 480 2244" },
                 { icon: <Mail className="size-3.5" />, label: "البريد", value: "info@alarabi-logistics.com" },
-                { icon: <Globe2 className="size-3.5" />, label: "نافذة", value: "متصل · API v2" },
+                { icon: <Globe2 className="size-3.5" />, label: "نافذة", value: "يتطلب اعتماد API رسمي" },
               ].map((item) => (
                 <li key={item.label} className="flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2">
                   <span className="flex items-center gap-1.5 text-slate-500">
