@@ -45,7 +45,19 @@ export function parseInvoiceText(text: string): ParsedInvoice {
   const incotermText = (labeled("incoterm|شروط التجارة|التعاقد") ?? text).toUpperCase();
   const incoterm = INCOTERMS.find((code) => new RegExp(`\\b${code}\\b`).test(incotermText)) ?? null;
   const paymentText = (labeled("payment terms|payment method|طريقة السداد|أسلوب السداد") ?? "").toLowerCase();
-  const paymentMethod = PAYMENT_METHODS.find((method) => paymentText.includes(method) || (method === "bank_transfer" && /تحويل|حوالة/.test(paymentText)) || (method === "letter_of_credit" && /اعتماد/.test(paymentText))) ?? null;
+  const paymentPatterns: Array<[RegExp, (typeof PAYMENT_METHODS)[number]]> = [
+    [/\b(?:l\s*\/\s*c|lc)\b|letter of credit|اعتماد/, "letter_of_credit"],
+    [/\b(?:t\s*\/\s*t|tt)\b|telegraphic transfer|wire transfer|تحويل|حوالة/, "bank_transfer"],
+    [/\b(?:d\s*\/\s*p|dp)\b|documents against payment|مستندات مقابل الدفع/, "documents_against_payment"],
+    [/\b(?:d\s*\/\s*a|da)\b|documents against acceptance|مستندات مقابل القبول/, "documents_against_acceptance"],
+    [/\bcad\b|cash against documents|نقد مقابل مستندات/, "cash_against_documents"],
+    [/advance payment|payment in advance|دفع مقدم/, "advance_payment"],
+    [/open account|حساب مفتوح/, "open_account"],
+    [/documentary collection|تحصيل مستندي/, "documentary_collection"],
+    [/cheque|check|شيك/, "cheque"],
+    [/\bcash\b|نقدي/, "cash"],
+  ];
+  const paymentMethod = PAYMENT_METHODS.find((method) => paymentText.includes(method)) ?? paymentPatterns.find(([pattern]) => pattern.test(paymentText))?.[1] ?? null;
   const dateText = labeled("invoice date|date|تاريخ الفاتورة|التاريخ");
   const dateMatch = dateText?.match(/\d{4}-\d{2}-\d{2}|\d{1,2}[/-]\d{1,2}[/-]\d{4}/)?.[0];
   const date = dateMatch && !Number.isNaN(new Date(dateMatch).getTime()) ? new Date(dateMatch).toISOString() : null;

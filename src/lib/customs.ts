@@ -26,14 +26,22 @@ export const INCOTERM_META: Record<string, { label: string; freightIncluded: boo
   DDP: { label: "تسليم مع الرسوم المدفوعة", freightIncluded: true, insuranceIncluded: true },
 };
 
-export const PAYMENT_METHODS = ["bank_transfer", "letter_of_credit", "documentary_collection", "cash", "cheque", "open_account"] as const;
+export const PAYMENT_METHODS = [
+  "bank_transfer", "letter_of_credit", "documentary_collection", "documents_against_payment",
+  "documents_against_acceptance", "cash_against_documents", "advance_payment", "cash", "cheque", "open_account",
+] as const;
+/** تسميات تجارة دولية شائعة؛ كود نافذة النهائي يخضع لخيارات الحساب المعتمد على المنصة. */
 export const PAYMENT_METHOD_META: Record<string, { label: string; labelEn: string }> = {
-  bank_transfer: { label: "حوالة بنكية", labelEn: "Bank transfer" },
-  letter_of_credit: { label: "اعتماد مستندي", labelEn: "Letter of credit" },
-  documentary_collection: { label: "تحصيل مستندي", labelEn: "Documentary collection" },
-  cash: { label: "نقدي", labelEn: "Cash" },
-  cheque: { label: "شيك", labelEn: "Cheque" },
-  open_account: { label: "حساب مفتوح", labelEn: "Open account" },
+  bank_transfer: { label: "T/T · Telegraphic Transfer — تحويل بنكي", labelEn: "T/T (Telegraphic Transfer)" },
+  letter_of_credit: { label: "L/C · Letter of Credit — اعتماد مستندي", labelEn: "L/C (Letter of Credit)" },
+  documentary_collection: { label: "Documentary Collection — تحصيل مستندي", labelEn: "Documentary Collection" },
+  documents_against_payment: { label: "D/P · Documents against Payment — مستندات مقابل الدفع", labelEn: "D/P (Documents against Payment)" },
+  documents_against_acceptance: { label: "D/A · Documents against Acceptance — مستندات مقابل القبول", labelEn: "D/A (Documents against Acceptance)" },
+  cash_against_documents: { label: "CAD · Cash against Documents — نقد مقابل مستندات", labelEn: "CAD (Cash against Documents)" },
+  advance_payment: { label: "Advance Payment — دفع مقدم", labelEn: "Advance Payment" },
+  cash: { label: "Cash — نقدي", labelEn: "Cash" },
+  cheque: { label: "Cheque — شيك", labelEn: "Cheque" },
+  open_account: { label: "Open Account — حساب مفتوح", labelEn: "Open Account" },
 };
 
 export const CUSTOMS_SYSTEMS = ["nafeza", "manifest", "email"] as const;
@@ -208,34 +216,46 @@ export function acidCountdown(submittedAt: string | Date, expiresAt: string | Da
 }
 
 export function normalizeImportedTariff(row: Record<string, unknown>): Omit<typeof tariffCodes.$inferInsert, "id" | "createdAt"> {
-  const str = (key: string) => String(row[key] ?? "").trim();
-  const code = str("code").replace(/\s/g, "");
+  const str = (...keys: string[]) => {
+    for (const key of keys) {
+      const found = Object.entries(row).find(([header]) => header.trim().toLowerCase() === key.toLowerCase());
+      if (found?.[1] !== null && found?.[1] !== undefined && String(found[1]).trim()) return String(found[1]).trim();
+    }
+    return "";
+  };
+  const numeric = (value: string) => value.replace(/[٠-٩]/g, (digit) => String(digit.charCodeAt(0) - 0x660))
+    .replace(/[۰-۹]/g, (digit) => String(digit.charCodeAt(0) - 0x6f0));
+  const code = numeric(str("code", "hs code", "hscode", "البند الجمركي", "رمز البند", "البند", "كود البند"))
+    .replace(/[.\s\-]/g, "");
   if (!/^\d{4,10}$/.test(code)) throw new Error(`كود جمركي غير صالح: ${code || "فارغ"}`);
-  const parseRate = (key: string): number | null => {
-    const raw = str(key);
+  const parseRate = (...keys: string[]): number | null => {
+    const raw = numeric(str(...keys)).replace(/[%٪,،\s]/g, "");
     if (!raw) return null;
-    const value = Number(raw.replace("%", ""));
-    if (!Number.isFinite(value) || value < 0 || value > 1000) throw new Error(`نسبة غير صالحة في ${key}`);
+    const value = Number(raw);
+    if (!Number.isFinite(value) || value < 0 || value > 100) throw new Error(`نسبة غير صالحة في ${keys[0]}`);
     return Math.round(value * 100);
   };
-  const list = (key: string) => str(key).split(/[|؛]/).map((s) => s.trim()).filter(Boolean);
+  const list = (...keys: string[]) => str(...keys).split(/[|؛;\n]/).map((s) => s.trim()).filter(Boolean);
+  const state = str("importStatus", "import_status", "حالة الاستيراد");
+  const legalDate = str("legalUpdatedAt", "تاريخ التحديث");
+  const parsedDate = legalDate ? new Date(legalDate) : null;
   return {
     code,
-    nameAr: str("nameAr") || str("name_ar") || code,
-    nameEn: str("nameEn") || str("name_en") || null,
-    chapter: str("chapter") || code.slice(0, 2),
-    category: str("category") || null,
-    unit: str("unit") || null,
-    dutyBps: parseRate("dutyBps") ?? parseRate("duty_bps"),
-    vatBps: parseRate("vatBps") ?? parseRate("vat_bps") ?? 1400,
-    importStatus: str("importStatus") in IMPORT_STATUS_META ? str("importStatus") : "verification_required",
-    authorities: list("authorities"),
-    conditions: list("conditions"),
-    sourceUrl: str("sourceUrl") || "https://customs.gov.eg/",
-    sourceReference: str("sourceReference") || "بيانات مستوردة — تحتاج مراجعة معتمدة",
-    legalUpdatedAt: str("legalUpdatedAt") ? new Date(str("legalUpdatedAt")) : null,
-    verified: str("verified") === "1" || str("verified") === "true" ? 1 : 0,
-    notes: str("notes") || null,
+    nameAr: str("nameAr", "name_ar", "وصف الصنف", "وصف البضاعة", "الصنف", "البيان", "الوصف") || code,
+    nameEn: str("nameEn", "name_en", "English Description", "الوصف بالإنجليزية") || null,
+    chapter: str("chapter", "الفصل") || code.slice(0, 2),
+    category: str("category", "القسم", "مجموعة") || null,
+    unit: str("unit", "الوحدة", "وحدة القياس") || null,
+    dutyBps: parseRate("dutyBps", "duty_bps", "فئة الضريبة الجمركية", "نسبة الرسم الجمركي", "نسبة الجمارك"),
+    vatBps: parseRate("vatBps", "vat_bps", "ضريبة القيمة المضافة", "نسبة ضريبة القيمة المضافة"),
+    importStatus: state && Object.prototype.hasOwnProperty.call(IMPORT_STATUS_META, state) ? state : "verification_required",
+    authorities: list("authorities", "الجهات الرقابية", "جهات العرض", "الجهات"),
+    conditions: list("conditions", "شروط الاستيراد", "الاشتراطات", "الشروط"),
+    sourceUrl: str("sourceUrl", "رابط المصدر") || null,
+    sourceReference: str("sourceReference", "مرجع القرار", "المنشور") || "بيانات مستوردة — تحتاج مراجعة المصدر والتعديلات",
+    legalUpdatedAt: parsedDate && !Number.isNaN(parsedDate.getTime()) ? parsedDate : null,
+    verified: str("verified", "معتمد") === "1" || str("verified", "معتمد").toLowerCase() === "true" ? 1 : 0,
+    notes: str("notes", "ملاحظات") || null,
   };
 }
 

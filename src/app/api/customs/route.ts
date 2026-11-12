@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { banks, contracts, shipmentItems, shipments, tariffCodes, commercialInvoices } from "@/db/schema";
 import { asDate, asNumber, asOptionalString, asString, getApiUser, jsonError, unauthorized } from "@/lib/api";
@@ -9,6 +9,7 @@ import { read, utils } from "xlsx";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 export async function GET() {
   const user = await getApiUser();
@@ -22,28 +23,45 @@ export async function POST(request: Request) {
   if (!user) return unauthorized();
   const content = request.headers.get("content-type") ?? "";
   if (content.includes("multipart/form-data")) {
+    if (!["admin", "manager"].includes(user.role)) return jsonError("استيراد كتاب التعريفة للمدير فقط.", 403);
     const form = await request.formData();
     const file = form.get("file");
     if (!(file instanceof File)) return jsonError("ارفع ملف تعريفة Excel أو CSV.");
-    if (file.size > 8 * 1024 * 1024) return jsonError("الحد الأقصى 8 ميجابايت.");
+    if (file.size > 4 * 1024 * 1024) return jsonError("الحد الأقصى 4 ميجابايت لكل ملف على Vercel؛ قسّم كتاب التعريفة إلى أكثر من ملف Excel إن لزم.");
     try {
       const buffer = Buffer.from(await file.arrayBuffer());
       const book = read(buffer, { type: "buffer" });
-      const rows = utils.sheet_to_json<Record<string, unknown>>(book.Sheets[book.SheetNames[0]], { defval: "" });
+      const rows = utils.sheet_to_json<Record<string, unknown>>(book.Sheets[book.SheetNames[0]], { defval: "", raw: false });
       if (!rows.length) return jsonError("الملف لا يحتوي بيانات.");
       if (rows.length > 20000) return jsonError("الحد الأقصى 20 ألف بند لكل استيراد.");
-      let imported = 0;
       const errors: string[] = [];
+      const normalized = new Map<string, ReturnType<typeof normalizeImportedTariff>>();
       for (const [index, row] of rows.entries()) {
         try {
           const values = normalizeImportedTariff(row);
-          await db.insert(tariffCodes).values(values).onConflictDoUpdate({ target: tariffCodes.code, set: values });
-          imported++;
+          normalized.set(values.code, values);
         } catch (error) {
-          errors.push(`صف ${index + 2}: ${error instanceof Error ? error.message : "بيانات غير صالحة"}`);
+          if (errors.length < 10) errors.push(`صف ${index + 2}: ${error instanceof Error ? error.message : "بيانات غير صالحة"}`);
         }
       }
-      return Response.json({ imported, errors: errors.slice(0, 10), message: `تم استيراد ${imported} بند. النسب المستوردة تحتاج مراجعة معتمدة.` });
+      const entries = [...normalized.values()];
+      let imported = 0;
+      for (let start = 0; start < entries.length; start += 100) {
+        const batch = entries.slice(start, start + 100);
+        await db.insert(tariffCodes).values(batch).onConflictDoUpdate({
+          target: tariffCodes.code,
+          set: {
+            nameAr: sql`excluded.name_ar`, nameEn: sql`excluded.name_en`, chapter: sql`excluded.chapter`,
+            category: sql`excluded.category`, unit: sql`excluded.unit`, dutyBps: sql`excluded.duty_bps`,
+            vatBps: sql`excluded.vat_bps`, importStatus: sql`excluded.import_status`,
+            authorities: sql`excluded.authorities`, conditions: sql`excluded.conditions`,
+            sourceUrl: sql`excluded.source_url`, sourceReference: sql`excluded.source_reference`,
+            legalUpdatedAt: sql`excluded.legal_updated_at`, verified: sql`excluded.verified`, notes: sql`excluded.notes`,
+          },
+        });
+        imported += batch.length;
+      }
+      return Response.json({ imported, errors, message: `تم استيراد/تحديث ${imported} بند في دفعات. تحقق من مصدر كل فئة ونصوص التذييلات والقرارات اللاحقة قبل الاعتماد.` });
     } catch {
       return jsonError("تعذّرت قراءة ملف التعريفة. استخدم الأعمدة النموذجية في ملف القالب.");
     }

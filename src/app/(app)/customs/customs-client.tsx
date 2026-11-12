@@ -239,7 +239,7 @@ export function CustomsClient({ initialData, clients, shipments, initialShipment
   }
 
   function downloadTemplate() {
-    const rows = [{ code: "1509100010", nameAr: "زيت زيتون", nameEn: "Olive oil", chapter: "15", category: "زيوت", unit: "كجم", dutyBps: "", vatBps: "14", importStatus: "verification_required", authorities: "مصلحة الجمارك", conditions: "راجع النسب والمنشورات الرسمية", sourceUrl: "https://customs.gov.eg/", sourceReference: "مرجع يحتاج اعتماد", legalUpdatedAt: "", verified: "0", notes: "" }];
+    const rows = [{ code: "1509100010", nameAr: "زيت زيتون", nameEn: "Olive oil", chapter: "15", category: "زيوت", unit: "كجم", dutyBps: "", vatBps: "", importStatus: "verification_required", authorities: "", conditions: "", sourceUrl: "", sourceReference: "أدخل مرجع الإصدار الرسمي", legalUpdatedAt: "", verified: "0", notes: "العينة لا تحتوي أي نسب جمركية أو ضريبية معتمدة" }];
     const csv = "\uFEFF" + Object.keys(rows[0]).join(",") + "\n" + rows.map((row) => Object.values(row).map((value) => `"${String(value).replace(/"/g, '""')}"`).join(",")).join("\n");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a"); a.href = url; a.download = "customs-tariff-template.csv"; a.click(); URL.revokeObjectURL(url);
