@@ -14,6 +14,7 @@ export async function POST(request: Request) {
   }
   const payload = body as Record<string, unknown>;
   const target = asString(payload.target, "all");
+  if (!["admin", "manager"].includes(user.role)) return jsonError("تنفيذ المزامنة متاح للمدير فقط.", 403);
 
   if (target === "carrier") {
     const carrierId = asNumber(payload.carrierId);
@@ -39,9 +40,9 @@ export async function POST(request: Request) {
   const summary = await syncAll(user.name);
   return Response.json({
     result: {
-      ok: summary.failed === 0,
-      level: summary.failed === 0 ? "success" : "warning",
-      message: `تمت مزامنة ${summary.success} شركة بنجاح، ${summary.warnings} تحذير، ${summary.failed} فشل من إجمالي ${summary.total}.`,
+      ok: summary.success > 0 && summary.failed === 0 && summary.warnings === 0,
+      level: summary.success > 0 && summary.failed === 0 && summary.warnings === 0 ? "success" : "warning",
+      message: `نتائج API الفعلية: ${summary.success} ناجحة، ${summary.warnings} بدون ربط/حركات، ${summary.failed} فشل من ${summary.total}. لم تُولَّد بوليصة أو رقم ACID تجريبي.`, 
     },
     summary,
     logs: await listLogs(20),
