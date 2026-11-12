@@ -3,12 +3,16 @@ import { Pool } from "pg";
 
 const databaseUrl = process.env.DATABASE_URL;
 
+// Do not crash the whole build/preview when the database is not configured yet:
+// the app must be deployable first, then connected to a PostgreSQL instance.
 if (!databaseUrl) {
-  throw new Error("DATABASE_URL is required");
+  console.error("[db] DATABASE_URL is not set — add it in the hosting environment variables.");
 }
 
-const isLocal = /(^|@)(localhost|127\.0\.0\.1|::1)(:|\/)/.test(databaseUrl);
-const hasSslParam = /[?&]sslmode=/i.test(databaseUrl);
+const connectionString = databaseUrl ?? "postgresql://postgres:postgres@127.0.0.1:5432/app_db";
+
+const isLocal = /(^|@)(localhost|127\.0\.0\.1|::1)(:|\/)/.test(connectionString);
+const hasSslParam = /[?&]sslmode=/i.test(connectionString);
 
 const globalForDb = globalThis as typeof globalThis & {
   __arenaNextJsPostgresqlPool?: Pool;
@@ -17,7 +21,7 @@ const globalForDb = globalThis as typeof globalThis & {
 export const pool =
   globalForDb.__arenaNextJsPostgresqlPool ??
   new Pool({
-    connectionString: databaseUrl,
+    connectionString,
     max: Number(process.env.PGPOOL_MAX ?? (isLocal ? 10 : 5)),
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 15_000,
