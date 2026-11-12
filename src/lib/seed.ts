@@ -7,11 +7,13 @@ import {
   integrationLogs,
   shipmentEvents,
   shipments,
+  tariffCodes,
   users,
 } from "@/db/schema";
 import { hashPassword } from "@/lib/password";
 import { sql } from "drizzle-orm";
 import { ensureSchema } from "@/lib/db-bootstrap";
+import { seedCustomsReference } from "@/lib/seed-customs";
 import type { DocType, Direction, InvoiceStatus, Mode, Priority, ShipmentStatus } from "@/lib/constants";
 
 const DAY = 86_400_000;
@@ -845,6 +847,12 @@ export async function ensureSeeded() {
         const existing = await db.select({ id: users.id }).from(users).limit(1);
         if (existing.length === 0) {
           await seedDemoData();
+        }
+        // Reference data for the customs workspace (tariffs, banks, contracts).
+        // Kept separate and idempotent so hosted databases get it on first boot.
+        const tariffCount = await db.select({ id: tariffCodes.id }).from(tariffCodes).limit(1);
+        if (tariffCount.length === 0) {
+          await seedCustomsReference();
         }
       } catch (error) {
         console.error("[seed] skipped:", error);
