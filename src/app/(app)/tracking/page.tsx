@@ -1,6 +1,7 @@
 import { PageHeader } from "@/components/ui";
 import { requireUser } from "@/lib/auth";
 import { listCarriers } from "@/lib/queries";
+import { providerStatus } from "@/lib/tracking";
 import { TrackingClient } from "./tracking-client";
 
 export const dynamic = "force-dynamic";
@@ -8,7 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function TrackingPage() {
   const user = await requireUser();
   const carriers = await listCarriers();
-  const providerConfigured = Boolean(process.env.TRACKING_API_URL && process.env.TRACKING_API_KEY);
+  const providerConfigured = providerStatus().ready;
 
   return (
     <div>

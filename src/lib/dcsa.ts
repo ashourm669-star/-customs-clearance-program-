@@ -15,7 +15,7 @@ export type ProviderConfig =
 export type LiveResult = {
   status: "ok" | "unconfigured" | "unauthorized" | "not_found" | "error";
   provider: string | null;
-  kind: ProviderConfig["kind"];
+  kind: ProviderConfig["kind"] | "trackingmore" | "dhl";
   httpStatus: number | null;
   message: string;
   events: LiveEvent[];

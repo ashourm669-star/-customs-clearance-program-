@@ -12,8 +12,9 @@ export async function GET(request: Request) {
   const query = (url.searchParams.get("q") ?? "").trim();
   if (query.length < 3) return jsonError("أدخل رقم بوليصة أو AWB أو رقم ملف (٣ أحرف على الأقل).");
 
-  const outcome = await searchByBillOfLading(query);
-  return Response.json({ ...outcome, providerStatus: providerStatus() });
+  const carrier = (url.searchParams.get("carrier") ?? "").trim().toUpperCase();
+  const outcome = await searchByBillOfLading(query, carrier);
+  return Response.json({ ...outcome, providerStatus: providerStatus() }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request) {
@@ -37,6 +38,6 @@ export async function POST(request: Request) {
   }
 
   const { importLiveTracking } = await import("@/lib/tracking");
-  const result = await importLiveTracking(query, user.name);
+  const result = await importLiveTracking(query, user.name, asString(payload.carrier).toUpperCase());
   return Response.json({ result }, { status: result.ok ? 200 : 400 });
 }

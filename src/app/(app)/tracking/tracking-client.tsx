@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -25,7 +25,7 @@ import { Badge, EmptyState, Spinner, cx } from "@/components/ui";
 import { useToast } from "@/components/toast";
 import { MODE_META, SHIPMENT_STATUS_META, type ShipmentStatus } from "@/lib/constants";
 import { formatDate, formatDateTime, relativeTime } from "@/lib/format";
-import { TRACKING_PORTALS, suggestedPortal } from "@/lib/carrier-directory";
+import { TRACKING_PORTALS, detectTrackingNumber, type TrackingDetection } from "@/lib/carrier-directory";
 
 type TrackingMatch = {
   id: number;
@@ -67,8 +67,9 @@ type Outcome = {
   query: string;
   local: TrackingMatch[];
   live: LiveResult;
+  detection: TrackingDetection;
   importedShipmentId: number | null;
-  providerStatus: { kind: string; ready: boolean; missing: string[]; provider: string | null };
+  providerStatus: { kind: string; ready: boolean; missing: string[]; provider: string | null; airCargoReady?: boolean; dhlReady?: boolean; maritimeReady?: boolean };
 };
 
 const EXAMPLES = ["MAEU-8841203", "EK-AWB-3329901", "CMDU-7733910", "CLR-2026-1001"];
@@ -92,6 +93,8 @@ export function TrackingClient({
   const router = useRouter();
   const toast = useToast();
   const [query, setQuery] = useState("");
+  const [carrierHint, setCarrierHint] = useState("");
+  const lastAutoQuery = useRef("");
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
@@ -109,7 +112,7 @@ export function TrackingClient({
     setError(null);
     setSearched(true);
     try {
-      const response = await fetch(`/api/tracking?q=${encodeURIComponent(value)}`);
+      const response = await fetch(`/api/tracking?q=${encodeURIComponent(value)}${carrierHint ? `&carrier=${encodeURIComponent(carrierHint)}` : ""}`, { cache: "no-store" });
       const data = (await response.json()) as Outcome & { error?: string };
       if (!response.ok) throw new Error(data.error ?? "تعذّر البحث.");
       setOutcome(data);
@@ -128,7 +131,7 @@ export function TrackingClient({
       const response = await fetch("/api/tracking", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "import", query: outcome.query }),
+        body: JSON.stringify({ action: "import", query: outcome.query, carrier: carrierHint }),
       });
       const data = (await response.json()) as {
         result?: { ok: boolean; message: string; shipmentId: number | null; reference: string | null };
@@ -147,7 +150,21 @@ export function TrackingClient({
     }
   }
 
-  const detectedPortal = suggestedPortal(query);
+  const detection = detectTrackingNumber(query, carrierHint);
+  const detectedPortal = detection.portal;
+
+  useEffect(() => {
+    const value = query.trim();
+    const current = detectTrackingNumber(value, carrierHint);
+    if (!current.ready || value.length < 8) return;
+    const key = `${current.normalized}|${carrierHint}`;
+    if (lastAutoQuery.current === key) return;
+    const timer = window.setTimeout(() => {
+      lastAutoQuery.current = key;
+      void runSearch(value);
+    }, 950);
+    return () => window.clearTimeout(timer);
+  }, [query, carrierHint]);
 
   return (
     <div className="space-y-5">
@@ -174,20 +191,34 @@ export function TrackingClient({
               <Search className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
               <input
                 value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="مثال: MAEU-8841203 أو MSCUAB123456 أو رقم AWB"
+                onChange={(event) => { setQuery(event.target.value); setSearched(false); setOutcome(null); }}
+                placeholder="مثال: 020-12345678 أو MSCU1234567 أو 1Z..."
                 className="input h-11 bg-white/95 pr-9 text-sm text-slate-900"
                 dir="ltr"
               />
             </div>
+            <select value={carrierHint} onChange={(event) => { setCarrierHint(event.target.value); setOutcome(null); }} className="input h-11 bg-white/95 text-xs text-slate-700 sm:w-40" aria-label="شركة الطرود إن كان رقمها لا يكشف الناقل">
+              <option value="">تحديد تلقائي</option>
+              <option value="DHL">DHL</option>
+              <option value="FDX">FedEx</option>
+              <option value="UPS">UPS</option>
+              <option value="ARX">Aramex</option>
+            </select>
             <button type="submit" disabled={loading} className="btn btn-mint h-11 px-5">
               {loading ? <Spinner /> : <Search className="size-4" />}
               استعلام
             </button>
           </form>
+          {query.trim().length >= 3 && (
+            <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg bg-white/10 px-3 py-2 text-[11px] text-white">
+              <Radar className="size-4 shrink-0 text-emerald-200" />
+              <span className="flex-1">{detection.message} {detection.ready ? (loading ? "جاري الاستعلام…" : "سيبدأ البحث تلقائياً عند توقف الكتابة.") : "أكمل الرقم أو اضغط استعلام."}</span>
+              {detectedPortal && <a href={detectedPortal.url} target="_blank" rel="noopener noreferrer" className="font-bold text-emerald-200 underline">موقع الناقل ↗</a>}
+            </div>
+          )}
 
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            <span className="text-[10px] text-slate-300">أرقام موجودة في قاعدة بياناتك:</span>
+            <span className="text-[10px] text-slate-300">أرقام تجريبية مسجّلة في ملفاتك:</span>
             {EXAMPLES.map((example) => (
               <button
                 key={example}
@@ -381,30 +412,25 @@ export function TrackingClient({
                     <KeyRound className="size-3.5" />
                     كيف تجعل الاستعلام حقيقياً (بدون تعديل كود)
                   </p>
-                  <div className="mt-1.5 space-y-2">
-                    <div>
-                      <p className="font-bold text-slate-700">الخيار الأول — واجهة DCSA مباشرة من الخط الملاحي:</p>
-                      <pre className="mt-1 overflow-x-auto rounded-md bg-slate-900 p-2 text-[9px] leading-5 text-emerald-300" dir="ltr">
-{`DCSA_BASE_URL=https://api.maersk.com/track-and-trace/v1
-DCSA_TOKEN_URL=https://api.maersk.com/oauth2/token
-DCSA_CLIENT_ID=...
-DCSA_CLIENT_SECRET=...`}
-                      </pre>
-                    </div>
-                    <div>
-                      <p className="font-bold text-slate-700">الخيار الثاني — مزوّد تتبع شامل (ShipsGo / Vizion / Terminal49):</p>
-                      <pre className="mt-1 overflow-x-auto rounded-md bg-slate-900 p-2 text-[9px] leading-5 text-emerald-300" dir="ltr">
-{`TRACKING_API_URL=https://api.shipsgo.com/v2/tracking
-TRACKING_API_KEY=...
-# اختياري: TRACKING_API_HEADER=X-Access-Token
-# اختياري: TRACKING_QUERY_PARAM=query`}
-                      </pre>
-                    </div>
-                    <p className="text-slate-500">
-                      المزوّد الشامل يعطي تغطية لأكثر من ٩٠ خطاً ملاحياً وبوالص AWB برقم واحد، لكنه يتطلب اشتراكاً مدفوعاً.
-                      أما واجهات الشركات مباشرة فتتطلب اعتماداً تجارياً (Client ID + Secret) وصلاحية وصول لهذه الشحنة.
-                    </p>
-                  </div>
+                   <div className="mt-1.5 space-y-2">
+                     <p>أضف المفاتيح في Vercel ← مشروعك ← Settings ← Environment Variables ثم أعد النشر. لا ترسل مفاتيحك داخل المحادثة.</p>
+                     <div>
+                       <p className="font-bold text-slate-700">AWB الجوي وشركات الطرود المدعومة:</p>
+                       <pre className="mt-1 overflow-x-auto rounded-md bg-slate-900 p-2 text-[9px] leading-5 text-emerald-300" dir="ltr">TRACKINGMORE_API_KEY=your_licensed_key</pre>
+                       <a href="https://www.trackingmore.com/docs/trackingmore" target="_blank" rel="noopener noreferrer" className="font-bold text-teal-700 underline">وثائق TrackingMore v4 ↗</a>
+                       <p>استعلام AWB قد يخصم رصيداً من حساب المزوّد؛ البحث الآلي يبدأ فقط بعد اكتمال الرقم.</p>
+                     </div>
+                     <div>
+                       <p className="font-bold text-slate-700">DHL Express مباشرة من واجهتها الرسمية:</p>
+                       <pre className="mt-1 overflow-x-auto rounded-md bg-slate-900 p-2 text-[9px] leading-5 text-emerald-300" dir="ltr">DHL_API_KEY=your_DHL_subscription_key</pre>
+                       <a href="https://developer.dhl.com/tracking" target="_blank" rel="noopener noreferrer" className="font-bold text-teal-700 underline">وثائق DHL Shipment Tracking ↗</a>
+                     </div>
+                     <div>
+                       <p className="font-bold text-slate-700">البحرية عبر ناقل يمنحك DCSA OAuth أو مزوّد API مصرح:</p>
+                       <p>أدخل DCSA_BASE_URL وDCSA_TOKEN_URL وDCSA_CLIENT_ID وDCSA_CLIENT_SECRET الصادرة لك رسمياً، أو TRACKING_API_URL وTRACKING_API_KEY لمزوّدك. لا تستخدم روابط تجريبية غير موثقة.</p>
+                     </div>
+                     <p>باقي الشركات لها بوابات تتبع حقيقية أدناه، لكن فتح الموقع لا يزوّد برنامجك تلقائياً ببيانات دون صلاحية API.</p>
+                   </div>
                 </div>
               ) : null}
 

@@ -2,7 +2,9 @@ import { desc, eq, ilike, or } from "drizzle-orm";
 import { db } from "@/db";
 import { carriers, clients, shipmentEvents, shipments } from "@/db/schema";
 import { iso } from "@/lib/format";
-import { lookupLive, readProviderConfig } from "@/lib/dcsa";
+import { readProviderConfig } from "@/lib/dcsa";
+import { lookupCarrier } from "@/lib/carrier-api";
+import type { TrackingDetection } from "@/lib/carrier-directory";
 import { nextShipmentReference } from "@/lib/api";
 import type { LiveResult } from "@/lib/dcsa";
 
@@ -27,16 +29,22 @@ export type SearchOutcome = {
   query: string;
   local: TrackingMatch[];
   live: LiveResult;
+  detection: TrackingDetection;
   importedShipmentId: number | null;
 };
 
 export function providerStatus() {
   const config = readProviderConfig();
+  const tm = Boolean(process.env.TRACKINGMORE_API_KEY);
+  const dhl = Boolean(process.env.DHL_API_KEY);
   return {
-    kind: config.kind,
-    ready: config.kind !== "unconfigured",
-    missing: config.kind === "unconfigured" ? config.missing : [],
-    provider: config.kind === "unconfigured" ? null : config.kind === "dcsa" ? new URL(config.baseUrl).host : new URL(config.url).host,
+    kind: config.kind !== "unconfigured" ? config.kind : tm ? "trackingmore" : dhl ? "dhl" : "unconfigured",
+    ready: config.kind !== "unconfigured" || tm || dhl,
+    missing: config.kind === "unconfigured" && !tm && !dhl ? ["TRACKINGMORE_API_KEY (للـAWB/شركات الطرود)", "DHL_API_KEY (لـDHL)", "DCSA_* أو TRACKING_* (للبحري)"] : [],
+    provider: config.kind === "dcsa" ? new URL(config.baseUrl).host : config.kind === "generic" ? new URL(config.url).host : tm ? "TrackingMore" : dhl ? "DHL" : null,
+    airCargoReady: tm,
+    dhlReady: dhl,
+    maritimeReady: config.kind !== "unconfigured",
   };
 }
 
@@ -116,8 +124,9 @@ async function saveLiveEvents(shipmentId: number, events: LiveResult["events"], 
   return fresh.length;
 }
 
-export async function searchByBillOfLading(query: string): Promise<SearchOutcome> {
-  const [local, live] = await Promise.all([searchLocalShipments(query), lookupLive(query)]);
+export async function searchByBillOfLading(query: string, carrierHint?: string): Promise<SearchOutcome> {
+  const [local, external] = await Promise.all([searchLocalShipments(query), lookupCarrier(query, carrierHint)]);
+  const { detection, live } = external;
   const normalized = query.trim().toLowerCase();
 
   let importedShipmentId: number | null = null;
@@ -127,7 +136,7 @@ export async function searchByBillOfLading(query: string): Promise<SearchOutcome
     importedShipmentId = exact.id;
   }
 
-  return { query, local, live, importedShipmentId };
+  return { query, local, live, detection, importedShipmentId };
 }
 
 export type ImportResult = {
@@ -139,8 +148,8 @@ export type ImportResult = {
 };
 
 /** Pull a real tracking response and persist it as a clearance file (or attach to an existing one). */
-export async function importLiveTracking(query: string, actor: string): Promise<ImportResult> {
-  const live = await lookupLive(query);
+export async function importLiveTracking(query: string, actor: string, carrierHint?: string): Promise<ImportResult> {
+  const { live, detection } = await lookupCarrier(query, carrierHint);
   if (live.status !== "ok" || live.events.length === 0) {
     return {
       ok: false,
@@ -179,7 +188,7 @@ export async function importLiveTracking(query: string, actor: string): Promise<
     .insert(shipments)
     .values({
       reference,
-      mode: "sea",
+      mode: detection.kind === "air_waybill" ? "air" : detection.kind === "courier" ? "land" : "sea",
       direction: "import",
       status: "under_review",
       priority: "normal",
