@@ -4,12 +4,18 @@ import { carriers, clients, documents, invoices, shipments, users } from "@/db/s
 import { requireUser, ROLE_LABELS } from "@/lib/auth";
 import { getStorageStats } from "@/lib/storage";
 import { getAppSettings } from "@/lib/queries";
+import { can } from "@/lib/permissions";
 import { SettingsClient } from "./settings-client";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
   const user = await requireUser();
+  if (!(["admin", "manager"].includes(user.role) && can(user.role, "settings", user.permissions))) {
+    return <SettingsClient user={user} roleLabel={ROLE_LABELS[user.role] ?? user.role}
+      stats={{ shipments: 0, clients: 0, carriers: 0, invoices: 0, documents: 0, users: 0 }}
+      storage={{ database: "", host: "", port: "", engine: "", totalSize: "", tables: [], lastWrite: null }} company={{}} />;
+  }
   const [shipmentCount, clientCount, carrierCount, invoiceCount, documentCount, userCount, storage, company] = await Promise.all([
     db.select({ total: count() }).from(shipments),
     db.select({ total: count() }).from(clients),

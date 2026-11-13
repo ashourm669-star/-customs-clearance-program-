@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AlertsPage() {
   const user = await requireUser();
-  const { alerts, activities, activityUnread } = await getNotificationFeed(user.id);
+  const { alerts, activities, activityUnread } = await getNotificationFeed(user);
   return (
     <div className="space-y-5">
       <PageHeader title="الإشعارات والتنبيهات" description="كل إضافة وتعديل وحذف محفوظة بإشعار، مع المستندات المعلقة والشحنات المتأخرة والفواتير المستحقة." />

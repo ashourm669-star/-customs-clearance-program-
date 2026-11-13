@@ -421,6 +421,16 @@ export function TrackingClient({
                        <p>استعلام AWB قد يخصم رصيداً من حساب المزوّد؛ البحث الآلي يبدأ فقط بعد اكتمال الرقم.</p>
                      </div>
                      <div>
+                       <p className="font-bold text-slate-700">لوفتهانزا مباشرة من Open API الرسمي (بادئة 020):</p>
+                       <pre className="mt-1 overflow-x-auto rounded-md bg-slate-900 p-2 text-[9px] leading-5 text-emerald-300" dir="ltr">LUFTHANSA_CLIENT_ID=your_approved_id{"\n"}LUFTHANSA_CLIENT_SECRET=your_approved_secret</pre>
+                       <a href="https://developer.lufthansa.com/docs/read/api_basics/Getting_Started" target="_blank" rel="noopener noreferrer" className="font-bold text-teal-700 underline">وثائق OAuth الرسمية ↗</a>
+                     </div>
+                     <div>
+                       <p className="font-bold text-slate-700">إير فرانس / KLM (057 / 074):</p>
+                       <pre className="mt-1 overflow-x-auto rounded-md bg-slate-900 p-2 text-[9px] leading-5 text-emerald-300" dir="ltr">AFKL_CARGO_TOKEN=your_approved_cargo_token</pre>
+                       <p>الوصول إلى Cargo Tracking API يتطلب موافقة من AFKL؛ مصر للطيران تحتاج مزوّد AWB معتمداً إن لم يتوفر API مباشر.</p>
+                     </div>
+                     <div>
                        <p className="font-bold text-slate-700">DHL Express مباشرة من واجهتها الرسمية:</p>
                        <pre className="mt-1 overflow-x-auto rounded-md bg-slate-900 p-2 text-[9px] leading-5 text-emerald-300" dir="ltr">DHL_API_KEY=your_DHL_subscription_key</pre>
                        <a href="https://developer.dhl.com/tracking" target="_blank" rel="noopener noreferrer" className="font-bold text-teal-700 underline">وثائق DHL Shipment Tracking ↗</a>

@@ -50,6 +50,7 @@ export async function POST(request: Request) {
   if (!user || !verifyPassword(password, user.passwordHash)) {
     return fail("البريد الإلكتروني أو كلمة المرور غير صحيحة.");
   }
+  if (user.active !== 1) return fail("هذا الحساب موقوف. راجع مدير النظام.", 403);
 
   await createSession(user.id);
 

@@ -20,6 +20,80 @@ function fail(kind: LiveResult["kind"], statusCode: number, raw: Record<string, 
   return empty(kind, status, `${provider} لم يُرجع بيانات: ${info}`, provider, statusCode, raw);
 }
 
+function airlineEvents(raw: Record<string, any>) {
+  const candidates = [
+    raw.shipmentTrackingStatus?.shipment?.milestones,
+    raw.shipmentTrackingStatus?.milestones,
+    raw.ShipmentTracking?.Shipment?.Milestone,
+    raw.ShipmentDetails?.Progress?.Events,
+    raw.ShipmentDetails?.Progress?.Routes,
+    raw.events,
+  ];
+  const flat = candidates.flatMap((value) => Array.isArray(value) ? value : value && typeof value === "object" ? [value] : []);
+  return flat.flatMap((item: Record<string, any>) => {
+    const nested = Array.isArray(item.events) ? item.events : [item];
+    return nested.flatMap((event: Record<string, any>) => {
+      const date = event.actualTime ?? event.actual_date ?? event.eventDateTime ?? event.plannedTime ?? event.dateUtc ?? null;
+      if (!date || Number.isNaN(new Date(date).getTime())) return [];
+      return [{
+        title: String(event.type ?? event.status ?? event.eventType ?? item.type ?? "تحديث رحلة جوية"),
+        description: event.flightNumber ? `الرحلة ${event.flightNumber}` : null,
+        location: event.station ?? event.routingLocationId ?? item.station ?? null,
+        occurredAt: new Date(date).toISOString(), type: "integration" as const, source: "provider" as const,
+      }];
+    });
+  });
+}
+
+async function trackLufthansa(number: string, clientId: string, clientSecret: string): Promise<LiveResult> {
+  const provider = "Lufthansa Open API";
+  try {
+    const tokenResponse = await fetch("https://api.lufthansa.com/v1/oauth/token", {
+      method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, grant_type: "client_credentials" }),
+      signal: AbortSignal.timeout(12_000), cache: "no-store",
+    });
+    const tokenBody = await decode(tokenResponse);
+    if (!tokenResponse.ok || !tokenBody.access_token) return fail("lufthansa", tokenResponse.status, { message: "تصريح Lufthansa OAuth غير صالح أو لا يتيح Cargo Tracking." }, provider);
+    const response = await fetch(`https://api.lufthansa.com/v1/cargo/shipmentTracking/${number.slice(0, 3)}-${number.slice(3)}`, {
+      headers: { Authorization: `Bearer ${tokenBody.access_token}`, Accept: "application/json" },
+      signal: AbortSignal.timeout(15_000), cache: "no-store",
+    });
+    const raw = await decode(response);
+    if (!response.ok) return fail("lufthansa", response.status, raw, provider);
+    const events = airlineEvents(raw);
+    if (!Object.keys(raw).some((key) => /shipment|tracking|status/i.test(key)) && !events.length) {
+      return empty("lufthansa", "not_found", "لم يؤكد Lufthansa وجود هذه البوليصة.", provider, response.status, raw);
+    }
+    return { kind: "lufthansa", status: "ok", provider, httpStatus: response.status,
+      message: events.length ? `وصلت ${events.length} حركة حقيقية من Lufthansa.` : "وصلت بيانات البوليصة من Lufthansa، لكن الرد بلا حركات مؤرخة قابلة للعرض؛ راجع التفاصيل الخام.",
+      events, raw, fetchedAt: new Date().toISOString() };
+  } catch (error) {
+    return empty("lufthansa", "error", `تعذّر الاتصال بـLufthansa: ${error instanceof Error ? error.message : "خطأ شبكة"}`);
+  }
+}
+
+async function trackAfkl(number: string, token: string): Promise<LiveResult> {
+  const provider = "Air France-KLM Cargo API";
+  try {
+    const base = process.env.AFKL_CARGO_API_URL || "https://api.klm.com/cargo/tracking/awbs";
+    const url = new URL(`${base.replace(/\/$/, "")}/${number.slice(0, 3)}-${number.slice(3)}`);
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+      signal: AbortSignal.timeout(15_000), cache: "no-store",
+    });
+    const raw = await decode(response);
+    if (!response.ok) return fail("afkl", response.status, raw, provider);
+    const events = airlineEvents(raw);
+    if (!raw.ShipmentDetails && !raw.shipmentDetails && !events.length) return empty("afkl", "not_found", "لم يؤكد مزوّد Air France-KLM وجود هذه البوليصة.", provider, response.status, raw);
+    return { kind: "afkl", status: "ok", provider, httpStatus: response.status,
+      message: events.length ? `وصلت ${events.length} حركة حقيقية من Air France-KLM.` : "وصلت بيانات البوليصة من Air France-KLM؛ راجع تفاصيل الرد الخام.",
+      events, raw, fetchedAt: new Date().toISOString() };
+  } catch (error) {
+    return empty("afkl", "error", `تعذّر الاتصال بـAir France-KLM: ${error instanceof Error ? error.message : "خطأ شبكة"}`);
+  }
+}
+
 async function trackAwb(number: string, key: string): Promise<LiveResult> {
   const provider = "TrackingMore Air Cargo";
   try {
@@ -141,10 +215,17 @@ export async function lookupCarrier(query: string, courierHint?: string): Promis
 
   let live: LiveResult;
   if (detection.kind === "air_waybill") {
-    live = process.env.TRACKINGMORE_API_KEY
-      ? await trackAwb(normalized, process.env.TRACKINGMORE_API_KEY)
-      : readProviderConfig().kind === "generic" ? await lookupLive(query)
-        : empty("unconfigured", "unconfigured", "تم تحديد بوليصة AWB؛ الاستعلام الآلي عن بياناتها يحتاج TRACKINGMORE_API_KEY مرخصاً (يغطي شركات الطيران المدعومة). افتح موقع الناقل إن لم يتوفر المفتاح.");
+    if (normalized.startsWith("020") && process.env.LUFTHANSA_CLIENT_ID && process.env.LUFTHANSA_CLIENT_SECRET) {
+      live = await trackLufthansa(normalized, process.env.LUFTHANSA_CLIENT_ID, process.env.LUFTHANSA_CLIENT_SECRET);
+    } else if ((normalized.startsWith("057") || normalized.startsWith("074")) && process.env.AFKL_CARGO_TOKEN) {
+      live = await trackAfkl(normalized, process.env.AFKL_CARGO_TOKEN);
+    } else if (process.env.TRACKINGMORE_API_KEY) {
+      live = await trackAwb(normalized, process.env.TRACKINGMORE_API_KEY);
+    } else if (readProviderConfig().kind === "generic") {
+      live = await lookupLive(query);
+    } else {
+      live = empty("unconfigured", "unconfigured", "تم تحديد بوليصة AWB، لكن لا يوجد اعتماد API لهذا الناقل. Lufthansa تتطلب OAuth، وAir France-KLM رمزاً معتمداً، ومصر للطيران يمكن تتبعها عبر مزوّد AWB مرخص. افتح موقع الناقل إن لم يتوفر المفتاح.");
+    }
   } else if (detection.kind === "courier" && detection.portal?.code === "DHL" && process.env.DHL_API_KEY) {
     live = await trackDhl(normalized, process.env.DHL_API_KEY);
   } else if (detection.kind === "courier" && detection.portal?.code && process.env.TRACKINGMORE_API_KEY) {

@@ -110,7 +110,7 @@ export function UsersClient({ initialUsers, actor }: { initialUsers: UserRow[]; 
           <Field label="الدور"><select className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>{Object.entries(ROLE_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></Field>
           <Field label="الحالة"><select className="input" value={form.active} onChange={(e) => setForm({ ...form, active: Number(e.target.value) })}><option value={1}>نشط</option><option value={0}>موقوف</option></select></Field>
           <div className="sm:col-span-2">
-            <p className="label">صلاحيات إضافية</p>
+            <p className="label">الصلاحيات الفعلية للموظف</p>
             <div className="grid gap-2 sm:grid-cols-2">
               {PERMISSIONS.map((permission) => (
                 <label key={permission.key} className="flex items-center gap-2 rounded-lg border border-slate-200 px-2.5 py-2 text-[11px] font-semibold text-slate-700">
@@ -119,7 +119,7 @@ export function UsersClient({ initialUsers, actor }: { initialUsers: UserRow[]; 
                 </label>
               ))}
             </div>
-            <p className="mt-2 text-[10px] text-slate-400">صلاحيات الدور الأساسية تُضاف تلقائياً ({form.role === "admin" ? "كل الصلاحيات" : (ROLE_PERMISSIONS[form.role] ?? []).length + " صلاحية"}).</p>
+            <p className="mt-2 text-[10px] font-semibold text-teal-700">{form.role === "admin" ? "المدير يملك كل الصلاحيات دائماً." : form.permissions.length ? `المحدد فقط (${form.permissions.length}) هو المتاح؛ لا تُضاف إليه صلاحيات الدور.` : `لم تُحدد صلاحيات خاصة: ستطبق صلاحيات الدور الافتراضية (${(ROLE_PERMISSIONS[form.role] ?? []).length}).`}</p>
           </div>
           {error ? <div className="rounded-xl bg-rose-50 p-3 text-xs font-semibold text-rose-700 sm:col-span-2">{error}</div> : null}
         </form>

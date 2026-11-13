@@ -14,6 +14,7 @@ import {
   users,
 } from "@/db/schema";
 import { iso } from "@/lib/format";
+import { LOCKED_COMPANY_FIELDS, LOCKED_COMPANY_KEYS } from "@/lib/company-identity";
 import type {
   CarrierRow,
   ClientRow,
@@ -386,14 +387,15 @@ export async function getAlerts(): Promise<Alert[]> {
 
 export async function getAppSettings(): Promise<Record<string, string>> {
   const rows = await db.select().from(appSettings);
-  return Object.fromEntries(rows.map((row) => [row.key, row.value]));
+  return { ...Object.fromEntries(rows.map((row) => [row.key, row.value])), ...LOCKED_COMPANY_FIELDS };
 }
 
 export async function setAppSettings(values: Record<string, string>, actor: string) {
-  for (const [key, value] of Object.entries(values)) {
+  const mutable = Object.entries(values).filter(([key]) => !LOCKED_COMPANY_KEYS.has(key));
+  for (const [key, value] of mutable) {
     await db.insert(appSettings).values({ key, value, updatedAt: new Date() }).onConflictDoUpdate({ target: appSettings.key, set: { value, updatedAt: new Date() } });
   }
-  await db.insert(auditLogs).values({ actorName: actor, action: "تحديث بيانات المنشأة", entity: "app_settings", details: Object.keys(values).join(", ") });
+  if (mutable.length) await db.insert(auditLogs).values({ actorName: actor, action: "تحديث بيانات المنشأة", entity: "app_settings", details: mutable.map(([key]) => key).join(", ") });
 }
 
 export async function listUsers() {

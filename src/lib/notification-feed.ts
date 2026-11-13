@@ -1,7 +1,8 @@
-import { and, count, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { changeNotifications, notificationReads } from "@/db/schema";
 import { getAlerts } from "@/lib/queries";
+import { activityVisibleTo, canAccessPath } from "@/lib/access";
 
 // The database trigger records every actual row change, including changes made by
 // different API routes. It never stores passwords, API keys, or document bytes.
@@ -24,7 +25,7 @@ BEGIN
   END IF;
 
   IF TG_TABLE_NAME = 'app_settings' AND (current_row->>'key') IN
-    ('business_identity_2026_11_v1','integration_truth_2026_11_v1','company_placeholder_cleanup_v1') THEN
+    ('business_identity_2026_11_v1','integration_truth_2026_11_v1','company_placeholder_cleanup_v1','locked_company_identity_2026_v2') THEN
     IF TG_OP = 'DELETE' THEN RETURN OLD; ELSE RETURN NEW; END IF;
   END IF;
 
@@ -103,10 +104,14 @@ export type ActivityNotice = {
   read: boolean;
 };
 
-export async function getNotificationFeed(userId: number) {
+type FeedUser = { id: number; role: string; permissions?: string[] | null };
+const allowedEntities = (user: FeedUser) => TABLES.filter((entity) => activityVisibleTo(user, entity));
+
+export async function getNotificationFeed(user: FeedUser) {
   await ensureNotificationTracking();
+  const allowed = allowedEntities(user);
   const [workAlerts, rows, unreadRows] = await Promise.all([
-    getAlerts(),
+    getAlerts().then((items) => items.filter((item) => canAccessPath(user, item.href))),
     db.select({
       id: changeNotifications.id,
       entity: changeNotifications.entity,
@@ -117,11 +122,12 @@ export async function getNotificationFeed(userId: number) {
       createdAt: changeNotifications.createdAt,
       readAt: notificationReads.readAt,
     }).from(changeNotifications).leftJoin(notificationReads,
-      and(eq(notificationReads.notificationId, changeNotifications.id), eq(notificationReads.userId, userId)))
+      and(eq(notificationReads.notificationId, changeNotifications.id), eq(notificationReads.userId, user.id)))
+      .where(inArray(changeNotifications.entity, allowed))
       .orderBy(desc(changeNotifications.id)).limit(100),
     db.select({ total: count() }).from(changeNotifications).leftJoin(notificationReads,
-      and(eq(notificationReads.notificationId, changeNotifications.id), eq(notificationReads.userId, userId)))
-      .where(isNull(notificationReads.notificationId)),
+      and(eq(notificationReads.notificationId, changeNotifications.id), eq(notificationReads.userId, user.id)))
+      .where(and(isNull(notificationReads.notificationId), inArray(changeNotifications.entity, allowed))),
   ]);
   const activities: ActivityNotice[] = rows.map((row) => ({
     id: row.id, entity: row.entity, entityRef: row.entityRef, operation: row.operation,
@@ -138,16 +144,22 @@ export async function getNotificationFeed(userId: number) {
   };
 }
 
-export async function markNotificationsRead(userId: number, ids?: number[]) {
+export async function markNotificationsRead(user: FeedUser, ids?: number[]) {
   await ensureNotificationTracking();
+  const allowed = allowedEntities(user);
+  if (!allowed.length) return;
   const clean = [...new Set((ids ?? []).filter((id) => Number.isSafeInteger(id) && id > 0))].slice(0, 200);
   if (ids === undefined) {
     await db.execute(sql`
       INSERT INTO notification_reads (user_id, notification_id)
-      SELECT ${userId}, id FROM change_notifications ON CONFLICT DO NOTHING
+      SELECT ${user.id}, id FROM change_notifications
+      WHERE entity IN (${sql.join(allowed.map((entity) => sql`${entity}`), sql`, `)})
+      ON CONFLICT DO NOTHING
     `);
   } else if (clean.length) {
-    await db.insert(notificationReads).values(clean.map((notificationId) => ({ userId, notificationId })))
+    const permitted = await db.select({ id: changeNotifications.id }).from(changeNotifications)
+      .where(and(inArray(changeNotifications.id, clean), inArray(changeNotifications.entity, allowed)));
+    if (permitted.length) await db.insert(notificationReads).values(permitted.map((row) => ({ userId: user.id, notificationId: row.id })))
       .onConflictDoNothing();
   }
 }

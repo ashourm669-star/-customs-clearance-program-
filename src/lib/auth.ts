@@ -17,6 +17,8 @@ export type SessionUser = {
   jobTitle: string | null;
   phone: string | null;
   avatarColor: string;
+  permissions: string[] | null;
+  active: number;
 };
 
 async function isSecureRequest() {
@@ -70,13 +72,15 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
         jobTitle: users.jobTitle,
         phone: users.phone,
         avatarColor: users.avatarColor,
+        permissions: users.permissions,
+        active: users.active,
       })
       .from(sessions)
       .innerJoin(users, eq(users.id, sessions.userId))
       .where(and(eq(sessions.token, token), gt(sessions.expiresAt, new Date())))
       .limit(1);
 
-    return rows[0] ?? null;
+    return rows[0]?.active === 1 ? rows[0] : null;
   } catch (error) {
     console.error("[auth] session lookup failed:", error);
     return null;

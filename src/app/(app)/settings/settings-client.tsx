@@ -20,6 +20,7 @@ import {
 import { Avatar, Badge, Field, PageHeader, SectionCard, Spinner } from "@/components/ui";
 import { useToast } from "@/components/toast";
 import type { SessionUser } from "@/lib/auth";
+import { can } from "@/lib/permissions";
 import type { StorageStats } from "@/lib/storage";
 import { InstallAppCard } from "@/components/pwa";
 
@@ -40,6 +41,7 @@ export function SettingsClient({
 }) {
   const router = useRouter();
   const toast = useToast();
+  const canManageCompany = ["admin", "manager"].includes(user.role) && can(user.role, "settings", user.permissions);
   const [profile, setProfile] = useState({
     name: user.name,
     jobTitle: user.jobTitle ?? "",
@@ -222,13 +224,14 @@ export function SettingsClient({
         <div className="space-y-5">
           <InstallAppCard />
 
-          <SectionCard title="تحرير بيانات المنشأة" description="كل الحقول قابلة للتعديل. أدخل العنوان والهاتف والترخيص الحقيقيين ثم اضغط حفظ؛ بطاقة المعاينة أسفل النموذج تتحدث مباشرة." bodyClassName="p-5">
+          {canManageCompany && <>
+          <SectionCard title="تحرير بيانات المنشأة" description="الاسم والعنوان ووسائل التواصل قابلة للتعديل. السجل التجاري والبطاقة الضريبية وبيان الترخيص ثابتة ومقفولة." bodyClassName="p-5">
             <form onSubmit={saveCompany} className="grid gap-3 sm:grid-cols-2">
               <Field label="اسم المنشأة"><input className="input" value={companyForm.company_name} onChange={(event) => setCompanyForm({ ...companyForm, company_name: event.target.value })} /></Field>
               <Field label="الاسم بالإنجليزية"><input className="input" dir="ltr" value={companyForm.company_name_en} onChange={(event) => setCompanyForm({ ...companyForm, company_name_en: event.target.value })} /></Field>
-              <Field label="رقم السجل التجاري" required><input className="input" dir="ltr" value={companyForm.commercial_register} onChange={(event) => setCompanyForm({ ...companyForm, commercial_register: event.target.value })} required /></Field>
-              <Field label="الرقم الضريبي" required><input className="input" dir="ltr" value={companyForm.tax_id} onChange={(event) => setCompanyForm({ ...companyForm, tax_id: event.target.value })} required /></Field>
-              <Field label="رقم ترخيص المخلص"><input className="input" dir="ltr" placeholder="رقم الترخيص الرسمي — لا تضع رقماً تجريبياً" value={companyForm.customs_license} onChange={(event) => setCompanyForm({ ...companyForm, customs_license: event.target.value })} /></Field>
+              <Field label="السجل التجاري · ثابت"><input className="input cursor-not-allowed bg-slate-100" dir="ltr" value={companyForm.commercial_register} readOnly aria-readonly="true" /></Field>
+              <Field label="البطاقة الضريبية · ثابت"><input className="input cursor-not-allowed bg-slate-100" dir="ltr" value={companyForm.tax_id} readOnly aria-readonly="true" /></Field>
+              <Field label="بيان الترخيص · ثابت"><input className="input cursor-not-allowed bg-slate-100" value={companyForm.customs_license} readOnly aria-readonly="true" /></Field>
               <Field label="الهاتف"><input className="input" dir="ltr" placeholder="رقم هاتف المنشأة الحقيقي" value={companyForm.phone} onChange={(event) => setCompanyForm({ ...companyForm, phone: event.target.value })} /></Field>
               <Field label="البريد الرسمي للمنشأة"><input type="email" className="input" dir="ltr" placeholder="البريد الرسمي إن وجد" value={companyForm.email} onChange={(event) => setCompanyForm({ ...companyForm, email: event.target.value })} /></Field>
               <Field label="الموقع الإلكتروني"><input type="url" className="input" dir="ltr" placeholder="https://..." value={companyForm.website} onChange={(event) => setCompanyForm({ ...companyForm, website: event.target.value })} /></Field>
@@ -330,6 +333,7 @@ export function SettingsClient({
               كل إضافة أو تعديل أو حذف تُكتب مباشرةً في قاعدة البيانات عبر Drizzle ORM، وليس في ذاكرة المتصفح.
             </p>
           </SectionCard>
+          </>}
 
           <SectionCard title="حسابك" bodyClassName="p-5">
             <div className="space-y-2 text-[11px]">

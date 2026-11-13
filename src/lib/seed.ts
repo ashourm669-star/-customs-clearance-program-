@@ -18,6 +18,7 @@ import { ensureSchema } from "@/lib/db-bootstrap";
 import { seedCustomsReference } from "@/lib/seed-customs";
 import type { DocType, Direction, InvoiceStatus, Mode, Priority, ShipmentStatus } from "@/lib/constants";
 import { BANK_DIRECTORY } from "@/lib/bank-directory";
+import { LOCKED_COMPANY_FIELDS } from "@/lib/company-identity";
 import { ensureNotificationTracking } from "@/lib/notification-feed";
 
 const DAY = 86_400_000;
@@ -887,6 +888,17 @@ export async function ensureSeeded() {
           }
           await db.insert(appSettings).values({ key: "company_placeholder_cleanup_v1", value: "applied" })
             .onConflictDoNothing();
+        }
+        // One-time requested fixed company identifiers; subsequent edits of mutable contact fields are retained.
+        const lockedMarker = await db.select({ key: appSettings.key }).from(appSettings)
+          .where(eq(appSettings.key, "locked_company_identity_2026_v2")).limit(1);
+        if (!lockedMarker.length) {
+          for (const [key, value] of Object.entries(LOCKED_COMPANY_FIELDS)) {
+            await db.insert(appSettings).values({ key, value }).onConflictDoUpdate({
+              target: appSettings.key, set: { value, updatedAt: new Date() },
+            });
+          }
+          await db.insert(appSettings).values({ key: "locked_company_identity_2026_v2", value: "applied" }).onConflictDoNothing();
         }
         // Change only the original demo admin email; never alter the user's password hash.
         const desiredEmail = "ashourm669@gmail.com";

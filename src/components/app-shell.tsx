@@ -28,6 +28,7 @@ import {
   X,
 } from "lucide-react";
 import { navSections } from "@/lib/constants";
+import { canAccessPath } from "@/lib/access";
 import type { SessionUser } from "@/lib/auth";
 import { Avatar } from "@/components/ui";
 import { InstallAppCard } from "@/components/pwa";
@@ -161,11 +162,13 @@ export function AppShell({ user, alertsCount = 0, activityUnreadCount = 0, nafez
       </div>
 
       <nav className="scroll-thin flex-1 space-y-5 overflow-y-auto px-3 py-4">
-        {navSections.map((section) => (
-          <div key={section.title}>
+        {navSections.map((section) => {
+          const visibleItems = section.items.filter((item) => canAccessPath(user, item.href));
+          if (!visibleItems.length) return null;
+          return <div key={section.title}>
             <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400/70">{section.title}</p>
             <ul className="space-y-1">
-              {section.items.map((item) => {
+              {visibleItems.map((item) => {
                 const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
                 return (
                   <li key={item.href}>
@@ -191,11 +194,11 @@ export function AppShell({ user, alertsCount = 0, activityUnreadCount = 0, nafez
                 );
               })}
             </ul>
-          </div>
-        ))}
+          </div>;
+        })}
       </nav>
 
-      <Link href="/integrations" className="mx-3 mb-3 rounded-xl border border-white/10 bg-white/[0.06] p-3">
+      {canAccessPath(user, "/integrations") && <Link href="/integrations" className="mx-3 mb-3 rounded-xl border border-white/10 bg-white/[0.06] p-3">
         <div className="flex items-center gap-2">
           <span className={`size-2 rounded-full ${nafezaConfigured && trackingConfigured ? "bg-amber-400" : "bg-rose-400"}`} />
           <p className="text-[11px] font-bold text-white">حالة الربط الخارجي</p>
@@ -206,7 +209,7 @@ export function AppShell({ user, alertsCount = 0, activityUnreadCount = 0, nafez
         <p className="mt-1.5 text-[10px] leading-5 text-slate-300/80">
           نافذة: {nafezaConfigured ? "مُعدّة، تحقق من استجابة API" : "لا يوجد اعتماد API"} · الناقلون: {trackingConfigured ? "مُعدّ، يحتاج اختبار" : "مواقع التتبع فقط"}
         </p>
-      </Link>
+      </Link>}
 
       <div className="px-3 pb-2">
         <InstallAppCard compact />
@@ -258,7 +261,7 @@ export function AppShell({ user, alertsCount = 0, activityUnreadCount = 0, nafez
               </p>
             </div>
 
-            <form onSubmit={submitSearch} className="relative mr-auto w-full max-w-xs">
+            {canAccessPath(user, "/shipments") ? <form onSubmit={submitSearch} className="relative mr-auto w-full max-w-xs">
               <Search className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
               <input
                 value={search}
@@ -266,17 +269,17 @@ export function AppShell({ user, alertsCount = 0, activityUnreadCount = 0, nafez
                 placeholder="بحث برقم الملف، البوليصة…"
                 className="input h-10 pr-9 text-xs"
               />
-            </form>
+            </form> : <div className="mr-auto" />}
 
-            <ExportMenu />
-            <Link href="/documents?camera=1" className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50" title="تصوير مرفق وحفظه" aria-label="فتح الكاميرا لإضافة مرفق">
+            {canAccessPath(user, "/reports") && <ExportMenu />}
+            {canAccessPath(user, "/documents") && <Link href="/documents?camera=1" className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50" title="تصوير مرفق وحفظه" aria-label="فتح الكاميرا لإضافة مرفق">
               <Camera className="size-5" />
-            </Link>
+            </Link>}
 
-            <Link href="/shipments?new=1" className="btn btn-mint hidden h-10 px-3 text-xs sm:inline-flex">
+            {canAccessPath(user, "/shipments") && <Link href="/shipments?new=1" className="btn btn-mint hidden h-10 px-3 text-xs sm:inline-flex">
               <Plus className="size-4" />
               ملف تخليص
-            </Link>
+            </Link>}
 
             <Link
               href="/alerts"
@@ -314,10 +317,10 @@ export function AppShell({ user, alertsCount = 0, activityUnreadCount = 0, nafez
                     <Settings className="size-4 text-slate-400" />
                     إعدادات الحساب
                   </Link>
-                  <Link href="/integrations" className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                  {canAccessPath(user, "/integrations") && <Link href="/integrations" className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
                     <PlugZap className="size-4 text-slate-400" />
                     حالة التكاملات
-                  </Link>
+                  </Link>}
                   <button
                     type="button"
                     onClick={logout}
@@ -348,7 +351,7 @@ export function AppShell({ user, alertsCount = 0, activityUnreadCount = 0, nafez
               { href: "/tracking", label: "تتبع", icon: <Radar className="size-[18px]" /> },
               { href: "/documents", label: "مستندات", icon: <FileStack className="size-[18px]" /> },
               { href: "/invoices", label: "فواتير", icon: <ReceiptText className="size-[18px]" /> },
-            ].map((tab) => {
+            ].filter((tab) => canAccessPath(user, tab.href)).map((tab) => {
               const active = pathname === tab.href || pathname.startsWith(`${tab.href}/`);
               return (
                 <Link

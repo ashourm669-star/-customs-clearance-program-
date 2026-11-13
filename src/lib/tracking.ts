@@ -37,12 +37,14 @@ export function providerStatus() {
   const config = readProviderConfig();
   const tm = Boolean(process.env.TRACKINGMORE_API_KEY);
   const dhl = Boolean(process.env.DHL_API_KEY);
+  const lh = Boolean(process.env.LUFTHANSA_CLIENT_ID && process.env.LUFTHANSA_CLIENT_SECRET);
+  const afkl = Boolean(process.env.AFKL_CARGO_TOKEN);
   return {
-    kind: config.kind !== "unconfigured" ? config.kind : tm ? "trackingmore" : dhl ? "dhl" : "unconfigured",
-    ready: config.kind !== "unconfigured" || tm || dhl,
-    missing: config.kind === "unconfigured" && !tm && !dhl ? ["TRACKINGMORE_API_KEY (للـAWB/شركات الطرود)", "DHL_API_KEY (لـDHL)", "DCSA_* أو TRACKING_* (للبحري)"] : [],
-    provider: config.kind === "dcsa" ? new URL(config.baseUrl).host : config.kind === "generic" ? new URL(config.url).host : tm ? "TrackingMore" : dhl ? "DHL" : null,
-    airCargoReady: tm,
+    kind: config.kind !== "unconfigured" ? config.kind : tm ? "trackingmore" : lh ? "lufthansa" : afkl ? "afkl" : dhl ? "dhl" : "unconfigured",
+    ready: config.kind !== "unconfigured" || tm || dhl || lh || afkl,
+    missing: config.kind === "unconfigured" && !tm && !dhl && !lh && !afkl ? ["TRACKINGMORE_API_KEY (للـAWB/شركات الطرود)", "LUFTHANSA_CLIENT_ID/SECRET (للوفتهانزا)", "AFKL_CARGO_TOKEN (لإير فرانس/KLM)", "DHL_API_KEY (لـDHL)", "DCSA_* أو TRACKING_* (للبحري)"] : [],
+    provider: config.kind === "dcsa" ? new URL(config.baseUrl).host : config.kind === "generic" ? new URL(config.url).host : tm ? "TrackingMore" : lh ? "Lufthansa" : afkl ? "AFKL" : dhl ? "DHL" : null,
+    airCargoReady: tm || lh || afkl,
     dhlReady: dhl,
     maritimeReady: config.kind !== "unconfigured",
   };

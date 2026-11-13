@@ -1,7 +1,6 @@
 import { eq, ilike } from "drizzle-orm";
 import { db } from "@/db";
 import { shipmentEvents, shipments } from "@/db/schema";
-import { getAppSettings } from "@/lib/queries";
 
 export type NafezaResult = {
   ok: boolean;
@@ -70,8 +69,9 @@ export async function sendNafezaDeclaration(identifier: string, actor: string): 
     };
   }
 
-  const company = await getAppSettings();
-  const license = company.customs_license?.trim() ?? "";
+  // The UI shows a descriptive licensing statement. An actual Nafeza declaration
+  // requires the authority-issued identifier separately; never submit the statement as an ID.
+  const license = process.env.NAFEZA_DECLARANT_LICENSE_ID?.trim() ?? "";
   const declaration = {
     declarant: { name: actor, license: license || null },
     transportDocumentReference: shipment.blNumber,
@@ -106,7 +106,7 @@ export async function sendNafezaDeclaration(identifier: string, actor: string): 
       ok: false,
       status: "error",
       reference: null,
-      message: "أدخل رقم ترخيص المخلص الحقيقي في الإعدادات قبل إرسال أي بيان إلى نافذة.",
+      message: "بيان الترخيص الظاهر في المنشأة وصف فقط. للإرسال الرسمي اضبط NAFEZA_DECLARANT_LICENSE_ID المخصص لك من الجهة المختصة ضمن متغيرات السيرفر.",
       httpStatus: null,
       payload: null,
     };
