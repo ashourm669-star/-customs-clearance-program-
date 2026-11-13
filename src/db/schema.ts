@@ -1,4 +1,4 @@
-import { integer, jsonb, numeric, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
+import { integer, jsonb, numeric, pgTable, primaryKey, serial, text, timestamp } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -291,6 +291,22 @@ export const appSettings = pgTable("app_settings", {
   value: text("value").notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+export const changeNotifications = pgTable("change_notifications", {
+  id: serial("id").primaryKey(),
+  entity: text("entity").notNull(),
+  entityRef: text("entity_ref"),
+  operation: text("operation").notNull(),
+  label: text("label").notNull(),
+  changedFields: text("changed_fields").array().notNull().default([]),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const notificationReads = pgTable("notification_reads", {
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  notificationId: integer("notification_id").notNull().references(() => changeNotifications.id, { onDelete: "cascade" }),
+  readAt: timestamp("read_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [primaryKey({ columns: [table.userId, table.notificationId] })]);
 
 export const auditLogs = pgTable("audit_logs", {
   id: serial("id").primaryKey(),

@@ -65,9 +65,10 @@ const pageTitles: Record<string, string> = {
   "/alerts": "الإشعارات والتنبيهات",
 };
 
-export function AppShell({ user, alertsCount = 0, nafezaConfigured = false, trackingConfigured = false, children }: {
+export function AppShell({ user, alertsCount = 0, activityUnreadCount = 0, nafezaConfigured = false, trackingConfigured = false, children }: {
   user: SessionUser;
   alertsCount?: number;
+  activityUnreadCount?: number;
   nafezaConfigured?: boolean;
   trackingConfigured?: boolean;
   children: ReactNode;
@@ -78,25 +79,40 @@ export function AppShell({ user, alertsCount = 0, nafezaConfigured = false, trac
   const [menuOpen, setMenuOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [liveAlertsCount, setLiveAlertsCount] = useState(alertsCount);
+  const [activityUnread, setActivityUnread] = useState(activityUnreadCount);
+  const [newActivityToast, setNewActivityToast] = useState(0);
+  const lastActivityUnread = useRef(activityUnreadCount);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setLiveAlertsCount(alertsCount);
-  }, [alertsCount]);
+    setActivityUnread(activityUnreadCount);
+  }, [alertsCount, activityUnreadCount]);
 
   useEffect(() => {
     let active = true;
     const refreshAlerts = async () => {
       try {
         const res = await fetch("/api/alerts", { cache: "no-store" });
-        if (res.ok && active) setLiveAlertsCount(Number((await res.json()).count ?? 0));
+        if (res.ok && active) {
+          const feed = await res.json();
+          const nextUnread = Number(feed.activityUnread ?? 0);
+          if (nextUnread > lastActivityUnread.current) {
+            setNewActivityToast(nextUnread - lastActivityUnread.current);
+            window.setTimeout(() => setNewActivityToast(0), 6500);
+          }
+          lastActivityUnread.current = nextUnread;
+          setLiveAlertsCount(Number(feed.count ?? 0));
+          setActivityUnread(nextUnread);
+        }
       } catch { /* the bell keeps the last known count while offline */ }
     };
     void refreshAlerts();
-    const timer = window.setInterval(refreshAlerts, 45_000);
+    const timer = window.setInterval(refreshAlerts, 20_000);
     const onVisible = () => { if (!document.hidden) void refreshAlerts(); };
     document.addEventListener("visibilitychange", onVisible);
-    return () => { active = false; window.clearInterval(timer); document.removeEventListener("visibilitychange", onVisible); };
+    window.addEventListener("alarabi:notifications-updated", refreshAlerts);
+    return () => { active = false; window.clearInterval(timer); document.removeEventListener("visibilitychange", onVisible); window.removeEventListener("alarabi:notifications-updated", refreshAlerts); };
   }, [pathname]);
 
   useEffect(() => {
@@ -264,15 +280,15 @@ export function AppShell({ user, alertsCount = 0, nafezaConfigured = false, trac
 
             <Link
               href="/alerts"
-              className="relative rounded-lg border border-slate-200 p-2 text-slate-600 transition hover:bg-slate-50"
-              aria-label="الإشعارات"
-            >
-              <Bell className="size-5" />
-              {liveAlertsCount > 0 ? (
-                <span className="absolute -left-0.5 -top-0.5 flex min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white">
-                  {liveAlertsCount > 9 ? "9+" : liveAlertsCount}
-                </span>
-              ) : null}
+               className="relative rounded-lg border border-slate-200 p-2 text-slate-600 transition hover:bg-slate-50"
+               aria-label={`الإشعارات · ${activityUnread} تحديثات جديدة، ${Math.max(0, liveAlertsCount - activityUnread)} تنبيهات شغل`}
+             >
+               <Bell className="size-5" />
+               {liveAlertsCount > 0 ? (
+                 <span className={`absolute -left-0.5 -top-0.5 flex min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold text-white ${activityUnread > 0 ? "bg-teal-600" : "bg-rose-500"}`}>
+                   {(activityUnread > 0 ? activityUnread : liveAlertsCount) > 9 ? "9+" : (activityUnread > 0 ? activityUnread : liveAlertsCount)}
+                 </span>
+               ) : null}
             </Link>
 
             <div className="relative" ref={menuRef}>
@@ -317,6 +333,12 @@ export function AppShell({ user, alertsCount = 0, nafezaConfigured = false, trac
         </header>
 
         <main className="app-safe-bottom px-4 pb-24 pt-5 sm:px-6 sm:pt-6 lg:pb-8">{children}</main>
+
+        {newActivityToast > 0 && (
+          <Link href="/alerts" onClick={() => setNewActivityToast(0)} className="fixed bottom-24 left-4 z-50 flex items-center gap-2 rounded-xl bg-[#0a2239] px-4 py-3 text-xs font-bold text-white shadow-2xl lg:bottom-6">
+            <BellRing className="size-4 text-[#7ee0cf]" /> {newActivityToast} تحديث جديد في البرنامج · عرض الإشعارات
+          </Link>
+        )}
 
         <nav className="mobile-bottom-nav fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur-md safe-bottom lg:hidden">
           <div className="grid grid-cols-5">

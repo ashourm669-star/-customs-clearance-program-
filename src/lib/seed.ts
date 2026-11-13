@@ -18,6 +18,7 @@ import { ensureSchema } from "@/lib/db-bootstrap";
 import { seedCustomsReference } from "@/lib/seed-customs";
 import type { DocType, Direction, InvoiceStatus, Mode, Priority, ShipmentStatus } from "@/lib/constants";
 import { BANK_DIRECTORY } from "@/lib/bank-directory";
+import { ensureNotificationTracking } from "@/lib/notification-feed";
 
 const DAY = 86_400_000;
 const ago = (days: number, hours = 9) => new Date(Date.now() - days * DAY + hours * 3_600_000);
@@ -928,6 +929,8 @@ export async function ensureSeeded() {
           });
           codes.add(bank.code);
         }
+        // Install triggers AFTER demo/reference seeding, so notifications represent real ongoing changes.
+        await ensureNotificationTracking();
       } catch (error) {
         console.error("[seed] skipped:", error);
         seedPromise = null;

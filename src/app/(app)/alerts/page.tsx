@@ -1,19 +1,22 @@
 import Link from "next/link";
 import { AlertTriangle, Bell, BookOpen, CheckCircle2, Clock, ExternalLink } from "lucide-react";
 import { requireUser } from "@/lib/auth";
-import { getAlerts } from "@/lib/queries";
+import { getNotificationFeed } from "@/lib/notification-feed";
+import { ActivityNotifications } from "@/components/activity-notifications";
 import { Badge, EmptyState, PageHeader, SectionCard } from "@/components/ui";
 import { OFFICIAL_REFERENCES } from "@/lib/customs-references";
 
 export const dynamic = "force-dynamic";
 
 export default async function AlertsPage() {
-  await requireUser();
-  const alerts = await getAlerts();
+  const user = await requireUser();
+  const { alerts, activities, activityUnread } = await getNotificationFeed(user.id);
   return (
     <div className="space-y-5">
-      <PageHeader title="الإشعارات والتنبيهات" description="تنبيهات حقيقية محسوبة من بياناتك: مستندات معلّقة، شحنات متأخرة، وفواتير تحتاج تحصيلاً." />
+      <PageHeader title="الإشعارات والتنبيهات" description="كل إضافة وتعديل وحذف محفوظة بإشعار، مع المستندات المعلقة والشحنات المتأخرة والفواتير المستحقة." />
+      <ActivityNotifications initial={activities} initialUnread={activityUnread} />
       <div className="card overflow-hidden">
+        <div className="border-b border-slate-100 px-5 py-4 text-sm font-bold text-slate-900">تنبيهات الشغل الحالية · {alerts.length}</div>
         {alerts.length === 0 ? (
           <EmptyState title="لا توجد تنبيهات" description="كل المستندات والفواتير والملفات في وضع سليم." icon={<CheckCircle2 className="size-7 text-emerald-500" />} />
         ) : (
